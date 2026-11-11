@@ -34,7 +34,9 @@ static const char* NTP_1 = "pool.ntp.org";
 static const char* NTP_2 = "time.nist.gov";
 static const char* AP_NAME = "PixelClock-Setup";
 static const float GAMMA = 2.0f;        // LEDs look washed out without gamma correction
-static const float MAX_DUTY = 0.40f;    // power limit: average LED duty, keeps a 5V 4A supply happy
+// Power limit: average LED duty. Adafruit rates a 64x64 panel at up to 4A at full white,
+// so 40% keeps the panel near 1.6A and the whole clock well under the 5.1V 3A supply.
+static const float MAX_DUTY = 0.40f;
 static const uint8_t BRIGHTNESS_LEVELS[] = {255, 160, 90, 40};
 static const int NIGHT_START = 23 * 60;  // dim between 11 pm ...
 static const int NIGHT_END = 6 * 60 + 30;  // ... and 6:30 am

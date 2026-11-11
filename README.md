@@ -47,23 +47,29 @@ The rules live in `simulator/schedule.js`, so changing a date window is a one-li
 
 ## Hardware
 
-| Part | Notes | Approx. cost |
-|---|---|---|
-| Adafruit Matrix Portal S3 | ESP32-S3 with WiFi, 2 buttons, accelerometer, USB-C. Plugs straight onto the panel. | $20 |
-| 64×64 RGB LED matrix, **P2** pitch, HUB75, 1/32 scan | P2 makes it about 12.8 cm (5") square | $25–40 |
-| 5V 4A USB-C power supply | LEDs are power hungry; a phone charger may not be enough | $10 |
-| USB-C data cable | Must carry data, not just charge | — |
-| Optional: smoked acrylic sheet or diffuser film | Turns individual dots into a soft glow | $10 |
-| Optional: frame | Shadow-box frame, wood, or 3D-printed | — |
+All from Adafruit, which only guarantees its own panels with the Matrix Portal.
 
-Finished size is roughly 14.8 cm square with a frame and 3.5–4 cm deep.
+| Part | Notes | Price |
+|---|---|---|
+| [Adafruit Matrix Portal S3](https://www.adafruit.com/product/5778) (PID 5778) | ESP32-S3 with WiFi, 2 buttons, accelerometer, USB-C. Plugs straight onto the panel. The PCB-antenna version. | $19.95 |
+| [64x64 RGB LED Matrix Panel, 2.5mm pitch, 45° curb-cut](https://www.adafruit.com/product/5407) (PID 5407) | 160 × 160 mm, 1/32 scan, 5 address lines. Includes the power cable and ribbon cable. "Curb-cut" only means the edges are bevelled. | $54.95 |
+| [Official Raspberry Pi USB-C power supply, 5.1V 3A](https://www.adafruit.com/product/4298) (PID 4298) | Thick 1.5 m 18 AWG cable, US plug. The firmware's power limit keeps the clock well under 3A. | $8.74 |
+| [Adjustable bent-wire stand](https://www.adafruit.com/product/1679) (PID 1679) | Holds the panel upright on a desk | $4.95 |
+| [USB-A to USB-C cable, 1 m](https://www.adafruit.com/product/4474) (PID 4474) | For flashing from a PC. Skip it if you already have a USB-C *data* cable. | $4.95 |
+| Optional: [black LED diffusion acrylic, 12" × 12"](https://www.adafruit.com/product/4594) (PID 4594) | Cuts glare and sharpens pixels. Has to be cut to 160 × 160 mm with a laser cutter or saw. | $9.95 |
+
+Prices and stock as checked on Adafruit in November 2026. Adafruit's 2 mm 64×64 panel (PID 5362, 128 mm) also works with this firmware if it's back in stock.
+
+You also need a soldering iron for one solder blob (see Wiring).
+
+Finished size is about 16 cm square, plus a frame if you add one.
 
 ## Wiring
 
 1. Plug the Matrix Portal S3 onto the panel's **input** HUB75 connector (the arrows printed on the panel point away from the input).
 2. Screw the panel's power cable into the Matrix Portal's screw terminals: red to `+`, black to `−`.
-3. Bridge the **address E** jumper on the Matrix Portal with a small blob of solder. 64×64 panels need this extra address line. It's the only soldering in the project.
-4. Connect USB-C to the 5V 4A supply.
+3. Close the **address E** jumper on the bottom of the Matrix Portal with a small blob of solder, so the middle pad connects to the pad marked **8**. 64×64 panels need this extra address line, and pin 8 is right for Adafruit's 64×64 panels. It's the only soldering in the project.
+4. Connect the Raspberry Pi USB-C power supply.
 
 Photos and a step-by-step guide will be added once the build is done.
 
@@ -104,7 +110,7 @@ cd firmware
 
 (Use plain `pio` if PlatformIO is installed globally. Add `pio device monitor` to watch the serial log.)
 
-Brightness levels, the night-dimming hours, gamma and the power limit are constants at the top of `firmware/src/main.cpp`. The power limit caps the panel's average brightness so a 5V 4A supply is never overloaded, even on bright daytime scenes.
+Brightness levels, the night-dimming hours, gamma and the power limit are constants at the top of `firmware/src/main.cpp`. The power limit caps the panel's average brightness at 40% of full white (Adafruit rates a 64×64 panel at up to 4A at full white), so the 5.1V 3A supply is never overloaded, even on bright daytime scenes.
 
 **Checking the C++ port against the simulator:**
 
