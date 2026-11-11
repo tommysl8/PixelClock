@@ -7,8 +7,10 @@ desktop.ini
 .vscode/
 .idea/
 
-# Firmware builds
+# Firmware builds and tools
 .pio/
+firmware/.venv/
+firmware/native/build/
 build/
 *.bin
 *.elf

@@ -13,6 +13,8 @@
  *
  * Options: --hour H (decimal), --date YYYY-MM-DD, --seconds S (warm-up, default 3),
  *          --frames N, --gap S, --scale PX (per LED, default 6), --out FILE, --seed N
+ *
+ * Also used as a module by tools/compare.js.
  */
 'use strict';
 
@@ -29,50 +31,33 @@ for (const f of fs.readdirSync(themeDir).sort()) {
 }
 const PC = globalThis.PixelClock;
 
-// ---------- args ----------
-const args = process.argv.slice(2);
-const target = args[0] && !args[0].startsWith('--') ? args[0] : 'all';
-const opt = (name, fallback) => {
-  const i = args.indexOf(`--${name}`);
-  return i >= 0 && args[i + 1] !== undefined ? args[i + 1] : fallback;
-};
-const flag = (name) => args.includes(`--${name}`);
-
-const now = new Date();
-const hour = Number(opt('hour', now.getHours() + now.getMinutes() / 60));
-const [year, month, day] = opt('date', `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`)
-  .split('-')
-  .map(Number);
-const warmup = Number(opt('seconds', 3));
-const frames = Number(opt('frames', 1));
-const gap = Number(opt('gap', 0.5));
-const scale = Number(opt('scale', 6));
-const seed = Number(opt('seed', 12345));
-
 const STEP = 1 / 30;
 
-function ctxAt(extraSeconds) {
-  const hf = (hour + extraSeconds / 3600) % 24;
-  const hours = Math.floor(hf);
-  const minutes = Math.floor((hf - hours) * 60);
-  return { hours, minutes, seconds: 0, ms: 0, hourFloat: hf, hour12: true, shake: false, year, month, day };
-}
-
 // Run a theme and return an array of framebuffers (Uint32Array copies).
-function run(theme) {
-  const rng = new PC.Rng(seed);
+// o: { hour, year, month, day, warmup, frames, gap, seed, shake }
+function run(theme, o) {
+  const ctxAt = (extraSeconds) => {
+    const hf = (o.hour + extraSeconds / 3600) % 24;
+    const hours = Math.floor(hf);
+    const minutes = Math.floor((hf - hours) * 60);
+    return {
+      hours, minutes, seconds: 0, ms: 0, hourFloat: hf, hour12: true, shake: false,
+      year: o.year, month: o.month, day: o.day,
+    };
+  };
+  const rng = new PC.Rng(o.seed);
   const inst = theme.create(rng);
   const fb = new PC.Canvas();
   const out = [];
   let t = 0;
   const steps = (s) => Math.round(s / STEP);
-  for (let i = 0; i < steps(warmup); i++, t += STEP) {
+  for (let i = 0; i < steps(o.warmup); i++, t += STEP) {
     const ctx = ctxAt(t);
-    ctx.shake = flag('shake') && i === steps(warmup) - steps(1);
+    ctx.shake = !!o.shake && i === steps(o.warmup) - steps(1);
     inst.update(STEP, ctx);
   }
-  for (let f = 0; f < frames; f++) {
-    if (f > 0) for (let i = 0; i < steps(gap); i++, t += STEP) inst.update(STEP, ctxAt(t));
+  for (let f = 0; f < o.frames; f++) {
+    if (f > 0) for (let i = 0; i < steps(o.gap); i++, t += STEP) inst.update(STEP, ctxAt(t));
     inst.draw(fb, ctxAt(t));
     out.push(Uint32Array.from(fb.px));
   }
@@ -117,8 +102,8 @@ function png(width, height, rgbBytes) {
   ]);
 }
 
-// Lay out panels in a grid, each drawn as LEDs with dark gaps.
-function sheet(panels, cols) {
+// Lay out 64x64 panels in a grid, each drawn as LEDs with dark gaps.
+function sheet(panels, cols, scale = 6) {
   const pad = scale * 2;
   const size = 64 * scale;
   const rows = Math.ceil(panels.length / cols);
@@ -149,20 +134,46 @@ function sheet(panels, cols) {
   return png(W, H, buf);
 }
 
-// ---------- main ----------
-let themes;
-if (target === 'all') themes = PC.themes;
-else if (target === 'auto') themes = [PC.themeById(PC.themeIdForDate(year, month, day))].filter(Boolean);
-else themes = [PC.themeById(target)].filter(Boolean);
+module.exports = { PC, run, sheet, png };
 
-if (!themes.length) {
-  console.error(`No theme "${target}". Installed: ${PC.themes.map((t) => t.id).join(', ')}`);
-  process.exit(1);
+// ---------- command line ----------
+if (require.main === module) {
+  const args = process.argv.slice(2);
+  const target = args[0] && !args[0].startsWith('--') ? args[0] : 'all';
+  const opt = (name, fallback) => {
+    const i = args.indexOf(`--${name}`);
+    return i >= 0 && args[i + 1] !== undefined ? args[i + 1] : fallback;
+  };
+  const now = new Date();
+  const [year, month, day] = opt('date', `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`)
+    .split('-')
+    .map(Number);
+  const o = {
+    hour: Number(opt('hour', now.getHours() + now.getMinutes() / 60)),
+    year,
+    month,
+    day,
+    warmup: Number(opt('seconds', 3)),
+    frames: Number(opt('frames', 1)),
+    gap: Number(opt('gap', 0.5)),
+    seed: Number(opt('seed', 12345)),
+    shake: args.includes('--shake'),
+  };
+
+  let themes;
+  if (target === 'all') themes = PC.themes;
+  else if (target === 'auto') themes = [PC.themeById(PC.themeIdForDate(year, month, day))].filter(Boolean);
+  else themes = [PC.themeById(target)].filter(Boolean);
+
+  if (!themes.length) {
+    console.error(`No theme "${target}". Installed: ${PC.themes.map((t) => t.id).join(', ')}`);
+    process.exit(1);
+  }
+
+  const panels = [];
+  for (const th of themes) panels.push(...run(th, o));
+  const cols = target === 'all' ? Math.min(4, panels.length) : panels.length;
+  const out = opt('out', path.join(process.cwd(), `render-${target}.png`));
+  fs.writeFileSync(out, sheet(panels, cols, Number(opt('scale', 6))));
+  console.log(`${themes.map((t) => t.id).join(', ')} @ ${o.hour.toFixed(2)}h ${year}-${month}-${day} -> ${out}`);
 }
-
-const panels = [];
-for (const th of themes) panels.push(...run(th));
-const cols = target === 'all' ? Math.min(4, panels.length) : panels.length;
-const out = opt('out', path.join(process.cwd(), `render-${target}.png`));
-fs.writeFileSync(out, sheet(panels, cols));
-console.log(`${themes.map((t) => t.id).join(', ')} @ ${hour.toFixed(2)}h ${year}-${month}-${day} -> ${out}`);

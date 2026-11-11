@@ -67,6 +67,60 @@ Finished size is roughly 14.8 cm square with a frame and 3.5–4 cm deep.
 
 Photos and a step-by-step guide will be added once the build is done.
 
+## Firmware
+
+The firmware in `firmware/` runs on the Matrix Portal S3. It uses the same themes as the simulator, ported to C++ and checked pixel for pixel against the JavaScript.
+
+**First boot:** the clock shows a WiFi symbol and opens a WiFi network called **PixelClock-Setup**. Join it from your phone, pick your home WiFi, and set your time zone if you're not on US Central time. The clock then sets its time from the internet and remembers everything.
+
+**Buttons**
+
+| Press | Does |
+|---|---|
+| ▲ or ▼ | Next or previous theme. The first entry is Auto (by date). |
+| Hold ▲ for 1 s | Cycle through 4 brightness levels |
+| Hold ▲ and ▼ for 5 s | Forget WiFi and restart into setup |
+
+Shake the clock to trigger the theme's shake effect. Between 11 pm and 6:30 am the display dims automatically.
+
+**Time zones** use POSIX TZ strings:
+
+| Zone | String |
+|---|---|
+| US Eastern | `EST5EDT,M3.2.0,M11.1.0` |
+| US Central | `CST6CDT,M3.2.0,M11.1.0` |
+| US Mountain | `MST7MDT,M3.2.0,M11.1.0` |
+| Arizona | `MST7` |
+| US Pacific | `PST8PDT,M3.2.0,M11.1.0` |
+| UK | `GMT0BST,M3.5.0/1,M10.5.0` |
+| Central Europe | `CET-1CEST,M3.5.0,M10.5.0/3` |
+
+**Build and flash** with [PlatformIO](https://platformio.org/). Plug the Matrix Portal S3 into your computer with a USB-C data cable, then:
+
+```bash
+cd firmware
+.venv/Scripts/pio run -t upload
+```
+
+(Use plain `pio` if PlatformIO is installed globally. Add `pio device monitor` to watch the serial log.)
+
+Brightness levels, the night-dimming hours, gamma and the power limit are constants at the top of `firmware/src/main.cpp`. The power limit caps the panel's average brightness so a 5V 4A supply is never overloaded, even on bright daytime scenes.
+
+**Checking the C++ port against the simulator:**
+
+```bash
+node tools/compare.js
+```
+
+This builds the C++ themes for your PC (with the Zig compiler from `firmware/.venv`), runs every theme through the same scenes in both languages, and reports how many pixels match. Add `--out DIR` to save side-by-side images of any differences, or `--timing` to see how long each frame takes.
+
+To set up the tools on a new machine:
+
+```bash
+python -m venv firmware/.venv
+firmware/.venv/Scripts/pip install platformio ziglang
+```
+
 ## How themes work
 
 The display is a 64×64 framebuffer of `0xRRGGBB` colours. A theme is a small module with two functions:
@@ -83,9 +137,17 @@ simulator/
   engine.js        framebuffer, colours, RNG, clock font, sky, stars, fireworks
   schedule.js      which theme to show on which date
   themes/          one file per theme
+firmware/
+  platformio.ini   board, libraries and build flags
+  src/main.cpp     panel, WiFi, time, buttons, shake, brightness
+  lib/PixelClock/  C++ port of engine.js, schedule.js and every theme
+  native/          PC test harness used by tools/compare.js
 tools/
   render.js        renders themes to PNG without a browser
+  compare.js       checks the C++ themes against the JavaScript ones
 ```
+
+When you change a theme, change both the `.js` and the `.cpp` and run `node tools/compare.js` to confirm they still match.
 
 ### Writing a theme
 
@@ -93,6 +155,7 @@ tools/
 2. Keep rows 0–13 calm: that's where the clock sits. Draw the clock last with `PC.drawClock(cv, ctx, color, shadow)`.
 3. Use the theme's `rng` for all randomness (never `Math.random`), so it behaves the same on the ESP32.
 4. Add a `<script>` tag for it in `simulator/index.html`. For a holiday, add its dates to `HOLIDAYS` in `schedule.js`.
+5. To put it on the clock, port it to `firmware/lib/PixelClock/src/themes/` (copy `christmas.cpp` as a pattern), add it to `themes.h`, `themes.cpp`, the schedule in `schedule.cpp` and `FACTORY` in `tools/compare.js`, then run `node tools/compare.js <id>` until it matches 100%.
 
 To preview themes without a browser:
 
@@ -108,8 +171,10 @@ That writes a contact sheet of every theme at 9 pm to `render-all.png`. You can 
 - [x] A theme for each season and major holiday
 - [x] Auto-switch themes by date
 - [x] Simulator hosted on GitHub Pages
-- [ ] Firmware for the Matrix Portal S3 (Arduino + Adafruit Protomatter)
-- [ ] WiFi time sync (NTP)
-- [ ] Theme switching with the board buttons; shake effects with the accelerometer
+- [x] Firmware for the Matrix Portal S3 (Arduino + Adafruit Protomatter), all themes ported to C++
+- [x] WiFi setup from your phone, time sync (NTP) with time zones
+- [x] Theme switching with the board buttons; shake effects with the accelerometer
+- [x] Brightness levels, night dimming and a power limit
+- [ ] Tune colours and gamma on the real panel
 - [ ] Phone control page: theme, brightness, night dimming
 - [ ] Wiring photos and a printable frame
