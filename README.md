@@ -6,7 +6,9 @@ Built on an ESP32-S3 (Adafruit Matrix Portal S3) driving an RGB LED matrix. Ever
 
 ## Try the simulator
 
-Open `simulator/index.html` in any browser. No install or build step is needed.
+**Live: [tommysl8.github.io/PixelClock](https://tommysl8.github.io/PixelClock/)**
+
+Or open `simulator/index.html` in any browser. No install or build step is needed.
 
 - **Theme** and the ▲ ▼ buttons work like the two buttons on the real board.
 - **Time** scrubs through the day so you can preview sunrise, daytime, sunset and night. **Play a day** runs a full day in about 24 seconds.
@@ -64,4 +66,4 @@ simulator/
 - [ ] Auto-switch themes by date
 - [ ] Phone control page: theme, brightness, night dimming
 - [ ] Wiring photos and a printable frame
-- [ ] Simulator hosted on GitHub Pages
+- [x] Simulator hosted on GitHub Pages
