@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PixelClock simulator</title>
+  <meta name="description" content="Live simulator for PixelClock, a 64x64 LED pixel-art desk clock with seasonal themes.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <header>
+      <h1>PixelClock</h1>
+      <p>A 64×64 LED desk clock. This is a live simulator of the real display.</p>
+    </header>
+
+    <section class="stage">
+      <div id="frame" class="frame diffused">
+        <canvas id="display" role="img" aria-label="Simulated 64 by 64 LED clock display"></canvas>
+      </div>
+      <div class="stand" aria-hidden="true"></div>
+    </section>
+
+    <section class="controls">
+      <div class="row">
+        <label for="theme">Theme</label>
+        <select id="theme"></select>
+        <div class="board-buttons" title="The two buttons on the Matrix Portal S3">
+          <button id="btn-up" aria-label="Board button up: next theme">▲</button>
+          <button id="btn-down" aria-label="Board button down: previous theme">▼</button>
+        </div>
+      </div>
+
+      <div class="row">
+        <label for="time">Time</label>
+        <input type="range" id="time" min="0" max="1439" step="1">
+        <output id="time-label">--:--</output>
+      </div>
+
+      <div class="row toggles">
+        <label class="check"><input type="checkbox" id="live" checked> Live time</label>
+        <button id="play-day">Play a day</button>
+        <label class="check"><input type="checkbox" id="hour12" checked> 12-hour</label>
+      </div>
+
+      <div class="row">
+        <label for="brightness">Brightness</label>
+        <input type="range" id="brightness" min="10" max="100" step="1" value="100">
+        <output id="brightness-label">100%</output>
+      </div>
+
+      <div class="row toggles">
+        <label class="check"><input type="checkbox" id="diffuser" checked> Diffuser</label>
+        <button id="shake">Shake it</button>
+      </div>
+
+      <p class="hint">Keys: <kbd>S</kbd> shake, <kbd>↑</kbd> <kbd>↓</kbd> change theme, <kbd>T</kbd> 12/24-hour</p>
+    </section>
+  </main>
+
+  <script src="engine.js"></script>
+  <script src="themes/winter.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

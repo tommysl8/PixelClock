@@ -1,0 +1,17 @@
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors
+.vscode/
+.idea/
+
+# Firmware builds
+.pio/
+build/
+*.bin
+*.elf
+
+# Node
+node_modules/
