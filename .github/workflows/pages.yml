@@ -25,6 +25,12 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      # Stamp script and stylesheet URLs with the commit, so browsers never mix
+      # cached files from an older deploy with new ones.
+      - name: Cache-bust asset URLs
+        run: |
+          sed -i -E "s/(src|href)=\"([^\":]+\.(js|css))\"/\1=\"\2?v=${GITHUB_SHA::7}\"/g" simulator/index.html
+          grep -E '\?v=' simulator/index.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

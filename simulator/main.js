@@ -151,10 +151,14 @@
     let id = wantedId();
     if (!PC.themeById(id)) id = PC.themes[0].id;
     if (id !== state.activeId) {
+      const theme = PC.themeById(id).create(rng);
       state.activeId = id;
-      state.theme = PC.themeById(id).create(rng);
+      state.theme = theme;
     }
-    ui.autoLabel.textContent = state.selection === 'auto' ? `Showing ${PC.themeById(id).name}` : '';
+    ui.autoLabel.textContent =
+      state.selection === 'auto'
+        ? `Showing ${PC.themeById(id).name} for this date`
+        : 'Auto is off, so the date won’t change the theme';
   }
 
   function select(selection) {
@@ -202,7 +206,23 @@
   let acc = 0;
   let lastSecond = -1;
 
+  function showError(err) {
+    console.error(err);
+    ui.autoLabel.textContent = `Something went wrong in “${PC.themeById(state.activeId)?.name ?? 'this theme'}”: ${err.message}`;
+  }
+
+  // Keep the loop alive even if a theme throws, so one bad frame can't freeze
+  // the whole simulator.
   function loop(ts) {
+    requestAnimationFrame(loop);
+    try {
+      tick(ts);
+    } catch (err) {
+      showError(err);
+    }
+  }
+
+  function tick(ts) {
     acc += Math.min(0.25, (ts - last) / 1000);
     last = ts;
 
@@ -231,7 +251,6 @@
       ui.timeLabel.textContent = fmt(t.hours, t.minutes);
       if (document.activeElement !== ui.time) ui.time.value = String(t.hours * 60 + t.minutes);
     }
-    requestAnimationFrame(loop);
   }
 
   // ---------- controls ----------
@@ -242,22 +261,32 @@
     ui.frame.classList.add('shaking');
   }
 
-  ui.theme.addEventListener('change', () => select(ui.theme.value));
-  ui.up.addEventListener('click', () => step(1));
-  ui.down.addEventListener('click', () => step(-1));
+  // Wrap control handlers so an error shows up on the page instead of failing silently.
+  const safe = (fn) => (...a) => {
+    try {
+      fn(...a);
+    } catch (err) {
+      showError(err);
+    }
+  };
 
-  ui.date.addEventListener('change', () => {
+  ui.theme.addEventListener('change', safe(() => select(ui.theme.value)));
+  ui.up.addEventListener('click', safe(() => step(1)));
+  ui.down.addEventListener('click', safe(() => step(-1)));
+
+  // Picking a date means "show me what the clock shows that day", so switch to Auto.
+  ui.date.addEventListener('change', safe(() => {
     const [y, m, d] = ui.date.value.split('-').map(Number);
     state.date = y && m && d ? { y, m, d } : null;
-    refreshTheme();
-  });
+    select('auto');
+  }));
 
-  ui.today.addEventListener('click', () => {
+  ui.today.addEventListener('click', safe(() => {
     state.date = null;
     syncDateInput();
     goLive();
-    refreshTheme();
-  });
+    select('auto');
+  }));
 
   ui.time.addEventListener('input', () => {
     state.playing = false;
@@ -291,7 +320,7 @@
 
   ui.shake.addEventListener('click', shake);
 
-  document.addEventListener('keydown', (e) => {
+  document.addEventListener('keydown', safe((e) => {
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
     if (e.key === 's' || e.key === 'S') shake();
     else if (e.key === 'ArrowUp') step(1);
@@ -301,7 +330,7 @@
       ui.hour12.checked = state.hour12;
     } else return;
     e.preventDefault();
-  });
+  }));
 
   syncDateInput();
   select('auto');
