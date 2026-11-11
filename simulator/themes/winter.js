@@ -1,476 +1,411 @@
 /*
- * Winter cabin theme: crackling fireplace, twinkling tree, snow past the
- * window, a sleeping cat, and a sky that follows the real time of day.
- *
- * A theme is { id, name, create(rng) } where create() returns
- *   { update(dt, ctx), draw(canvas, ctx) }.
- * ctx carries the time (hours, minutes, seconds, hourFloat), hour12, and
- * one-shot events like ctx.shake (the accelerometer on the real board).
+ * Snowy hills (winter season): rolling snow hills, snow-capped pines, a
+ * snowman in a top hat, a distant cabin with a warm window and chimney smoke,
+ * and snow falling in two layers. At night: stars, moon, and a soft aurora.
+ * Shake: blizzard.
  */
 (function (PC) {
   'use strict';
 
-  const { mix, dim, clamp } = PC;
+  const { mix, clamp, hash, skyAt, daylight } = PC;
 
-  // ---------- palette ----------
-  const COL = {
-    wallNight: 0x1a1222,
-    wallDay: 0x3b2d3f,
-    floorNight: 0x2b1a10,
-    floorDay: 0x4a3020,
-    plank: 0x1f120a,
-    rugEdge: 0x8e2f3a,
-    rug: 0x6b1f2a,
-    rugDot: 0xc9a227,
-    frame: 0x6b4428,
-    sill: 0x84593a,
-    snow: 0xeef4ff,
-    snowPile: 0xdfe8f5,
-    moon: 0xf4f1d0,
-    star: 0xcfd8ff,
-    brick: 0x7d2f20,
-    brickAlt: 0x6e2a1c,
-    mortar: 0x4f1d14,
-    hearth: 0x514139,
-    opening: 0x0b0605,
-    mantel: 0x5b3a22,
-    mantelTop: 0x74502f,
-    log: 0x5a3418,
-    logDark: 0x3e2410,
-    ember: 0xff6a1a,
-    leaf: 0x1f6b2e,
-    leafLight: 0x2a8a3c,
-    leafDark: 0x145022,
-    trunk: 0x5a3418,
-    starDim: 0xc9a227,
-    starBright: 0xfff3a0,
-    glow: 0xff8a2a,
-    clock: 0xffe9c4,
-    clockShadow: 0x0c0710,
+  // Scene colours in daylight.
+  const BASE = {
+    snowFar: 0x8ba8d4,
+    snowFarShade: 0x7895c4,
+    snowMid: 0xc4d6ee,
+    snowMidShade: 0xa3bbdc,
+    snowMidRim: 0xe2ecf8,
+    snowNear: 0xf0f5fd,
+    snowNearShade: 0xcbd9ed,
+    snowNearRim: 0xffffff,
+    pine: 0x22603a,
+    pineDark: 0x153f26,
+    pineSnow: 0xf0f5fd,
+    pineSnowShade: 0xc6d5ea,
+    trunk: 0x4a2e1a,
+    cabin: 0x7a4e2c,
+    cabinDark: 0x55351e,
+    roof: 0xf2f6fc,
+    roofEdge: 0x6f7f9c,
+    chimney: 0x6a3226,
+    door: 0x3a2214,
+    snowman: 0xffffff,
+    snowmanShade: 0xc9d6ea,
+    snowmanLine: 0x7d93b6,
+    coal: 0x1a1a22,
+    carrot: 0xff8a1e,
+    scarf: 0xd63a3a,
+    scarfDark: 0x9e2626,
+    stick: 0x5a3418,
+    hat: 0x1c1c24,
+    hatBand: 0xc03434,
   };
+  // Moonlit versions of the snow; anything not listed is tinted toward NIGHT.
+  const NIGHT_BASE = {
+    snowFar: 0x26386a,
+    snowFarShade: 0x1f2f5c,
+    snowMid: 0x374b80,
+    snowMidShade: 0x2b3d6e,
+    snowMidRim: 0x5468a0,
+    snowNear: 0x55699e,
+    snowNearShade: 0x435689,
+    snowNearRim: 0x7a8cc0,
+    pine: 0x255c4e,
+    pineDark: 0x173e3c,
+    pineSnow: 0x6a7eb4,
+    pineSnowShade: 0x4c5f94,
+    roof: 0x6a7eb4,
+    roofEdge: 0x1c2648,
+    snowman: 0x9aacd8,
+    snowmanShade: 0x7184b8,
+    snowmanLine: 0x2c3a68,
+  };
+  const NIGHT = 0x0b1430;
+  const NIGHT_AMOUNT = 0.6;
+  const NIGHT_PAL = {};
+  for (const key in BASE) NIGHT_PAL[key] = NIGHT_BASE[key] ?? mix(BASE[key], NIGHT, NIGHT_AMOUNT);
 
-  // Fire heat 0..12 mapped to colour (0 = nothing drawn).
-  const FIRE = [
-    0, 0x1a0502, 0x3a0a03, 0x5e1204, 0x861b05, 0xa82806, 0xc93a08,
-    0xe2560c, 0xf07514, 0xf8951f, 0xfcb33a, 0xfed062, 0xffe9a0,
+  // Crisp winter sky: deeper blue by day, pink at dawn and dusk.
+  const WINTER_SKY = [
+    [0, 0x050a1e, 0x142250],
+    [5.5, 0x050a1e, 0x142250],
+    [7, 0x34407e, 0xeea0a0],
+    [9, 0x4c8ad2, 0xa6cbee],
+    [15.5, 0x4c8ad2, 0xa6cbee],
+    [17, 0x3e3e7a, 0xe58a7a],
+    [18.5, 0x0c1238, 0x26305e],
+    [24, 0x050a1e, 0x142250],
   ];
-  const MAX_HEAT = FIRE.length - 1;
 
-  const LIGHT_COLORS = [0xff4545, 0xffd23f, 0x4fc3ff, 0xff7fd0, 0x7dff8a];
+  const WINDOW_LIT = 0xffc35a;
+  const WINDOW_HOT = 0xffe08a;
+  const MOON = 0xf4f1d0;
+  const SUN = 0xfff4d0;
+  const SMOKE = 0xb8c0cc;
+  const AURORA_A = 0x3cffb0;
+  const AURORA_B = 0x40b8ff;
+  const CLOCK = 0xffffff;
+  const CLOCK_SHADOW = 0x121a33;
 
-  // Sky through the day: [hour, top colour, bottom colour].
-  const SKY = [
-    [0, 0x050b1f, 0x0d1a3a],
-    [5.5, 0x050b1f, 0x0d1a3a],
-    [7, 0x3b4a8c, 0xf2a66b],
-    [9, 0x6fb2ea, 0xc9e3f6],
-    [15.5, 0x6fb2ea, 0xc9e3f6],
-    [17, 0x45457a, 0xe8835a],
-    [18.5, 0x0d1236, 0x2a2a5c],
-    [24, 0x050b1f, 0x0d1a3a],
-  ];
+  // Hill outlines (top row of each hill per column).
+  const FAR = [];
+  const MID = [];
+  const NEAR = [];
+  for (let x = 0; x < 64; x++) {
+    FAR.push(Math.round(37 + 2.5 * Math.sin(x * 0.08 + 0.5) + 1.5 * Math.sin(x * 0.21 + 2)));
+    MID.push(Math.round(45 + 3 * Math.sin(x * 0.06 + 2.2) + 1.2 * Math.sin(x * 0.17)));
+    NEAR.push(Math.round(54 + 1.5 * Math.sin(x * 0.05 + 1)));
+  }
+  const CABIN_X = 42; // centre column of the cabin on the far hill
+  const PINES = [
+    [27, 9],
+    [5, 19],
+    [19, 15],
+    [12, 12],
+    [62, 11],
+  ]; // [x, height] on the middle hill, back to front
+  const SNOWMAN_X = 51;
 
-  function skyAt(hf) {
-    for (let i = 0; i < SKY.length - 1; i++) {
-      const [h0, t0, b0] = SKY[i];
-      const [h1, t1, b1] = SKY[i + 1];
-      if (hf >= h0 && hf <= h1) {
-        const t = (hf - h0) / (h1 - h0 || 1);
-        return [mix(t0, t1, t), mix(b0, b1, t)];
+  function disc(cv, cx, cy, r, c) {
+    const rr = r * r + r * 0.6;
+    for (let y = Math.floor(cy - r); y <= Math.ceil(cy + r); y++) {
+      for (let x = Math.floor(cx - r); x <= Math.ceil(cx + r); x++) {
+        if ((x - cx) * (x - cx) + (y - cy) * (y - cy) <= rr) cv.set(x, y, c);
       }
     }
-    return [SKY[0][1], SKY[0][2]];
   }
 
-  // 0 at night, 1 in full daylight.
-  function daylight(hf) {
-    if (hf < 6 || hf > 18.5) return 0;
-    if (hf < 9) return (hf - 6) / 3;
-    if (hf > 15.5) return clamp(1 - (hf - 15.5) / 3, 0, 1);
-    return 1;
+  function line(cv, x0, y0, x1, y1, c) {
+    const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+    for (let i = 0; i <= n; i++) cv.set(x0 + ((x1 - x0) * i) / n, y0 + ((y1 - y0) * i) / n, c);
   }
-
-  // ---------- layout (all in LED coordinates) ----------
-  const WIN = { x0: 2, y0: 17, x1: 17, y1: 34 }; // window frame, outer
-  const SKY_BOX = { x0: 4, y0: 19, x1: 15, y1: 32 }; // glass
-  const MULLION_X = 9; // vertical bar is MULLION_X..MULLION_X+1
-  const TRANSOM_Y = 25; // horizontal bar is TRANSOM_Y..TRANSOM_Y+1
-  const FP = { x0: 20, y0: 36, x1: 43, y1: 57 }; // brick fireplace
-  const OPEN = { x0: 25, y0: 42, x1: 38, y1: 57 }; // firebox opening
-  const FIREBOX = { x: 25, y: 43, w: 14, h: 14 }; // simulated flames
-  const FLOOR_Y = 58;
-  const TREE_X = 55;
-  const TREE_TIERS = [
-    [18, 29, 1, 5],
-    [27, 39, 3, 6],
-    [37, 50, 4, 7],
-  ]; // [top row, bottom row, half-width at top, half-width at bottom]
-
-  function treeHalfWidth(y) {
-    let hw = -1;
-    for (const [a, b, s, e] of TREE_TIERS) {
-      if (y >= a && y <= b) hw = Math.max(hw, s + Math.floor(((y - a) * (e - s)) / (b - a)));
-    }
-    return hw;
-  }
-
-  const STARS = [
-    [5, 20],
-    [7, 23],
-    [15, 24],
-    [6, 28],
-    [11, 23],
-    [14, 29],
-    [12, 31],
-  ];
-
-  // Sleeping cat, facing the fire. Two frames for breathing.
-  const CAT_A = [
-    '......O.O',
-    '..OSOSOOO',
-    '.OOOOOOdO',
-    'TTOOOOOOO',
-  ];
-  const CAT_B = [
-    '......O.O',
-    '.OOSOSOOO',
-    '.OOOOOOdO',
-    'TTOOOOOOO',
-  ];
-  const CAT_TAIL_UP = [
-    '......O.O',
-    '..OSOSOOO',
-    'TOOOOOOdO',
-    '.TOOOOOOO',
-  ];
-  const CAT_PAL = { O: 0xd9822b, S: 0xa35a17, d: 0x4a2a12, T: 0xc0701f };
-
-  const STOCKING = ['WW.', 'RR.', 'RR.', 'RRR'];
 
   function create(rng) {
-    const heat = new Uint8Array(FIREBOX.w * FIREBOX.h);
-    let fireLevel = 0.8;
-    let flare = 0;
-
     let t = 0;
+    let wind = 0;
+    let blizzard = 0;
 
-    // snow outside the window
-    const flakes = [];
-    function newFlake(anywhere) {
-      return {
-        bx: SKY_BOX.x0 + rng.float() * (SKY_BOX.x1 - SKY_BOX.x0 + 1),
-        y: anywhere ? SKY_BOX.y0 + rng.float() * (SKY_BOX.y1 - SKY_BOX.y0) : SKY_BOX.y0 - 1,
-        v: 2.5 + rng.float() * 3.5,
-        ph: rng.float() * 6.283,
-      };
-    }
-    for (let i = 0; i < 10; i++) flakes.push(newFlake(true));
+    // two layers of snow: far (small, slow, dim) and near (bright, faster)
+    const far = [];
+    const near = [];
+    const newFlake = (layer, anywhere) => ({
+      x: rng.float() * 64,
+      y: anywhere ? rng.float() * 64 : -1 - rng.float() * 4,
+      v: layer === 0 ? 3 + rng.float() * 2.5 : 7 + rng.float() * 5,
+      ph: rng.float() * 6.283,
+    });
+    for (let i = 0; i < 28; i++) far.push(newFlake(0, true));
+    for (let i = 0; i < 16; i++) near.push(newFlake(1, true));
 
-    // tree lights at fixed spots inside the tree
-    const lights = [];
-    const taken = new Set();
-    for (let tries = 0; lights.length < 18 && tries < 400; tries++) {
-      const y = 20 + rng.int(30);
-      const hw = treeHalfWidth(y);
-      if (hw < 1) continue;
-      const x = TREE_X - hw + 1 + rng.int(2 * hw - 1);
-      const key = x * 100 + y;
-      if (taken.has(key) || taken.has(key + 1) || taken.has(key - 1) || taken.has(key + 100) || taken.has(key - 100)) continue;
-      taken.add(key);
-      lights.push({ x, y, c: rng.int(LIGHT_COLORS.length), on: rng.chance(0.6) });
-    }
-    lights.sort((a, b) => a.y - b.y || a.x - b.x);
-    let lightMode = 0; // 0 twinkle, 1 chase, 2 breathe
-    let modeTimer = 0;
+    const smoke = [];
+    let smokeTimer = 0;
 
-    // snow globe particles (shake the clock!)
-    const globe = [];
+    const swirl = []; // blizzard particles after a shake
 
-    // cat
-    let catTail = 0;
-
-    function stepFire() {
-      const { w, h } = FIREBOX;
-      if (flare > 0) flare--;
-      else if (rng.chance(0.01)) flare = 6 + rng.int(8);
-
-      // Heat source along the bottom row, hottest where the logs cross.
-      for (let x = 0; x < w; x++) {
-        const edge = Math.abs(x - (w - 1) / 2) / ((w - 1) / 2);
-        const base = Math.round(MAX_HEAT - edge * 5) + (flare > 0 ? 1 : 0);
-        heat[(h - 1) * w + x] = clamp(base - rng.int(3), 0, MAX_HEAT);
-      }
-      // Each cell pulls heat from below (with a little sideways drift) and cools.
-      for (let y = 0; y < h - 1; y++) {
-        for (let x = 0; x < w; x++) {
-          const sx = clamp(x + rng.int(3) - 1, 0, w - 1);
-          const below = heat[(y + 1) * w + sx];
-          // average cooling of ~0.8 per row lets the centre flames reach the top of the firebox
-          const cool = rng.int(3) === 0 ? 0 : rng.chance(0.25) ? 2 : 1;
-          heat[y * w + x] = Math.max(0, below - cool);
-        }
-      }
-      // Fire brightness drives the room glow.
-      let sum = 0;
-      for (let y = h - 5; y < h; y++) for (let x = 0; x < w; x++) sum += heat[y * w + x];
-      const level = sum / (5 * w * MAX_HEAT);
-      fireLevel += (level - fireLevel) * 0.25;
-    }
-
-    function spawnGlobe() {
-      for (let i = 0; i < 160; i++) {
-        globe.push({
-          x: rng.float() * 64,
-          y: rng.float() * 64,
-          vx: (rng.float() - 0.5) * 50,
-          vy: -10 - rng.float() * 30,
-          life: 6 + rng.float() * 4,
-          age: 0,
-          ph: rng.float() * 6.283,
-        });
+    function moveFlakes(list, layer, dt) {
+      const drift = layer === 0 ? 0.5 : 1;
+      for (let i = 0; i < list.length; i++) {
+        const f = list[i];
+        f.y += f.v * dt * (blizzard > 0 ? 1.6 : 1);
+        f.x += (wind * drift + Math.sin(t * 1.3 + f.ph) * (layer === 0 ? 0.6 : 1.4)) * dt;
+        if (f.x < -2) f.x += 66;
+        if (f.x > 65) f.x -= 66;
+        if (f.y > 64) list[i] = newFlake(layer, false);
       }
     }
 
     function update(dt, ctx) {
       t += dt;
-      stepFire();
+      const calm = 2.5 * Math.sin(t * 0.13) + 1.2 * Math.sin(t * 0.37);
+      const target = blizzard > 0 ? 26 : calm;
+      wind += (target - wind) * Math.min(1, dt * 1.5);
+      if (blizzard > 0) blizzard -= dt;
 
-      for (let i = 0; i < flakes.length; i++) {
-        const f = flakes[i];
-        f.y += f.v * dt;
-        if (f.y > SKY_BOX.y1 - 0.5) flakes[i] = newFlake(false);
+      moveFlakes(far, 0, dt);
+      moveFlakes(near, 1, dt);
+
+      // chimney smoke puffs drift up and with the wind
+      smokeTimer -= dt;
+      if (smokeTimer <= 0) {
+        smokeTimer = 0.45 + rng.float() * 0.3;
+        smoke.push({ x: CABIN_X + 2, y: FAR[CABIN_X] - 11, age: 0, life: 3 + rng.float() * 1.5, ph: rng.float() * 6.283 });
+      }
+      for (let i = smoke.length - 1; i >= 0; i--) {
+        const s = smoke[i];
+        s.age += dt;
+        s.y -= 2.2 * dt;
+        s.x += (wind * 0.35 - 0.6 + Math.sin(t * 1.7 + s.ph) * 0.4) * dt;
+        if (s.age > s.life) smoke.splice(i, 1);
       }
 
-      modeTimer += dt;
-      if (modeTimer > 12) {
-        modeTimer = 0;
-        lightMode = (lightMode + 1) % 3;
-      }
-      if (lightMode === 0) {
-        for (const l of lights) if (rng.chance(0.04)) l.on = !l.on;
-      }
-
-      if (catTail > 0) catTail -= dt;
-      else if (rng.chance(0.004)) catTail = 0.35;
-
-      if (ctx.shake) spawnGlobe();
-      for (let i = globe.length - 1; i >= 0; i--) {
-        const p = globe[i];
-        p.age += dt;
-        p.vx *= 0.96;
-        p.vy = Math.min(p.vy + 14 * dt, 7);
-        p.x += (p.vx + Math.sin(t * 2 + p.ph) * 3) * dt;
-        p.y += p.vy * dt;
-        if (p.y > 63) {
-          p.y = 63;
-          p.vy = 0;
+      if (ctx.shake) {
+        blizzard = 4;
+        for (let i = 0; i < 150; i++) {
+          swirl.push({
+            x: rng.float() * 64,
+            y: rng.float() * 64,
+            vx: 15 + rng.float() * 35,
+            vy: (rng.float() - 0.5) * 30,
+            age: 0,
+            life: 3 + rng.float() * 3,
+            ph: rng.float() * 6.283,
+          });
         }
-        if (p.age > p.life) globe.splice(i, 1);
+      }
+      for (let i = swirl.length - 1; i >= 0; i--) {
+        const p = swirl[i];
+        p.age += dt;
+        p.vx *= 0.985;
+        p.vy = p.vy * 0.97 + Math.sin(t * 3 + p.ph) * 8 * dt + 4 * dt;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        if (p.x > 64) p.x -= 64;
+        if (p.age > p.life) swirl.splice(i, 1);
       }
     }
 
     // ---------- drawing ----------
-    function drawRoom(cv, day) {
-      const wall = mix(COL.wallNight, COL.wallDay, day * 0.7);
-      const stripe = dim(wall, 0.82);
-      for (let y = 0; y < FLOOR_Y; y++) {
-        for (let x = 0; x < 64; x++) cv.set(x, y, x % 6 === 0 ? stripe : wall);
-      }
-      const floor = mix(COL.floorNight, COL.floorDay, day * 0.6);
-      cv.rect(0, FLOOR_Y, 63, 63, floor);
-      cv.rect(0, 61, 63, 61, COL.plank);
-      for (let x = 5; x < 64; x += 11) cv.set(x, 59 + ((x >> 2) & 1), COL.plank);
-
-      // rug
-      cv.rect(3, 59, 18, 62, COL.rugEdge);
-      cv.rect(4, 60, 17, 61, COL.rug);
-      for (let x = 5; x < 17; x += 3) cv.set(x, 60 + ((x / 3) & 1), COL.rugDot);
-    }
-
-    function drawWindow(cv, hf, day) {
-      const [top, bottom] = skyAt(hf);
-      cv.rect(WIN.x0, WIN.y0, WIN.x1, WIN.y1, COL.frame);
-      for (let y = SKY_BOX.y0; y <= SKY_BOX.y1; y++) {
-        const c = mix(top, bottom, (y - SKY_BOX.y0) / (SKY_BOX.y1 - SKY_BOX.y0));
-        cv.rect(SKY_BOX.x0, y, SKY_BOX.x1, y, c);
-      }
-
+    function drawSky(cv, hf, day) {
+      const [top, bottom] = skyAt(hf, WINTER_SKY);
+      PC.vgradient(cv, 0, 0, 63, 44, top, bottom);
       const night = 1 - day;
-      if (night > 0.3) {
-        STARS.forEach(([x, y], i) => {
-          const tw = 0.5 + 0.5 * Math.sin(t * 2.3 + i * 1.7);
-          cv.blend(x, y, COL.star, (night - 0.3) * tw);
-        });
-        // moon with a soft edge
-        const a = Math.min(1, (night - 0.3) * 2);
-        cv.rect(12, 20, 14, 22, mix(top, COL.moon, a));
-        for (const [x, y] of [[12, 20], [14, 20], [12, 22], [14, 22]]) cv.set(x, y, mix(top, COL.moon, a * 0.45));
+      PC.drawStars(cv, t, night, 0, 0, 63, 34, 30);
+
+      if (night > 0.2) {
+        // aurora: two soft wavy ribbons, kept below the clock
+        const a = (night - 0.2) / 0.8;
+        for (let x = 0; x < 64; x++) {
+          const cy = 21 + 3.5 * Math.sin(x * 0.11 + t * 0.45) + 1.8 * Math.sin(x * 0.047 - t * 0.27);
+          const pulse = 0.55 + 0.45 * Math.sin(x * 0.27 + t * 1.1);
+          for (let dy = -3; dy <= 3; dy++) {
+            const y = Math.round(cy + dy);
+            if (y < 15) continue;
+            const k = 1 - Math.abs(dy) / 4;
+            cv.blend(x, y, mix(AURORA_A, AURORA_B, (dy + 3) / 6), a * 0.32 * k * pulse);
+          }
+        }
+        // moon, right of the clock
+        const m = Math.min(1, a * 1.5);
+        disc(cv, 56, 9, 2.4, mix(top, MOON, m));
+        cv.set(55, 8, mix(top, 0xffffff, m));
       }
-
-      const flakeCol = mix(0xb9c6e0, COL.snow, day);
-      for (const f of flakes) {
-        const x = f.bx + Math.sin(t * 1.5 + f.ph) * 0.8;
-        if (x >= SKY_BOX.x0 && x <= SKY_BOX.x1 + 0.49) cv.set(x, f.y, flakeCol);
+      if (day > 0) {
+        disc(cv, 9, 21, 2.2, mix(bottom, SUN, day));
       }
-
-      // snow piled on the bottom of the glass
-      cv.rect(SKY_BOX.x0, SKY_BOX.y1, SKY_BOX.x1, SKY_BOX.y1, COL.snowPile);
-      for (const x of [4, 5, 12, 13, 14]) cv.set(x, SKY_BOX.y1 - 1, COL.snowPile);
-
-      // mullions and sill
-      cv.rect(MULLION_X, SKY_BOX.y0, MULLION_X + 1, SKY_BOX.y1, COL.frame);
-      cv.rect(SKY_BOX.x0, TRANSOM_Y, SKY_BOX.x1, TRANSOM_Y + 1, COL.frame);
-      cv.rect(WIN.x0 - 1, WIN.y1 + 1, WIN.x1 + 1, WIN.y1 + 1, COL.sill);
     }
 
-    function drawFireplace(cv) {
-      for (let y = FP.y0; y <= FP.y1; y++) {
-        const row = Math.floor((y - FP.y0) / 3);
-        for (let x = FP.x0; x <= FP.x1; x++) {
-          const mortar = (y - FP.y0) % 3 === 0 || (x - FP.x0 + (row % 2) * 3) % 6 === 0;
-          const shade = ((Math.floor((x - FP.x0 + (row % 2) * 3) / 6) + row) % 3) === 0 ? COL.brickAlt : COL.brick;
-          cv.set(x, y, mortar ? COL.mortar : shade);
-        }
-      }
-      cv.rect(OPEN.x0, OPEN.y0, OPEN.x1, OPEN.y1, COL.opening);
-      // rounded top corners of the opening
-      cv.set(OPEN.x0, OPEN.y0, COL.brick);
-      cv.set(OPEN.x1, OPEN.y0, COL.brick);
-
-      // flames
-      const { x: fx, y: fy, w, h } = FIREBOX;
-      for (let y = 0; y < h; y++) {
-        for (let x = 0; x < w; x++) {
-          const v = heat[y * w + x];
-          if (v > 0) cv.set(fx + x, fy + y, FIRE[v]);
-        }
-      }
-
-      // logs with glowing embers
-      cv.rect(26, 56, 37, 56, COL.log);
-      cv.rect(28, 55, 35, 55, COL.logDark);
-      for (const x of [27, 30, 33, 36]) {
-        if (rng.chance(0.7)) cv.set(x, 56, mix(COL.log, COL.ember, 0.5 + rng.float() * 0.5));
-      }
-
-      cv.rect(FP.x0 - 1, FLOOR_Y, FP.x1 + 1, FLOOR_Y, COL.hearth);
-
-      // mantel + garland
-      cv.rect(19, 34, 44, 35, COL.mantel);
-      cv.rect(19, 34, 44, 34, COL.mantelTop);
-      cv.rect(19, 33, 44, 33, COL.leafDark);
-      for (let x = 20, i = 0; x <= 43; x += 4, i++) {
-        const on = (Math.floor(t * 1.5) + i) % 2 === 0;
-        cv.set(x, 33, on ? LIGHT_COLORS[i % 2 === 0 ? 0 : 1] : COL.leaf);
-      }
-
-      // stockings
-      cv.sprite(STOCKING, 22, 36, { W: 0xf2f2f2, R: 0xc0392b });
-      cv.sprite(STOCKING, 39, 36, { W: 0xf2f2f2, R: 0x2e8b57 });
-    }
-
-    function drawTree(cv) {
-      for (let y = 18; y <= 50; y++) {
-        const hw = treeHalfWidth(y);
-        if (hw < 0) continue;
-        for (let x = TREE_X - hw; x <= TREE_X + hw; x++) {
-          let c = x < TREE_X ? COL.leafLight : COL.leaf;
-          if ((x * 7 + y * 3) % 5 === 0) c = COL.leafDark;
-          if (x === TREE_X + hw) c = COL.leafDark;
+    function drawPine(cv, P, cx, base, h) {
+      const trunkH = 2;
+      cv.rect(cx, base - trunkH, cx + (h > 13 ? 1 : 0), base, P.trunk);
+      const body = h - trunkH;
+      const top = base - trunkH - body;
+      const tier = Math.ceil(body / 3);
+      for (let r = 0; r < body; r++) {
+        const y = top + r;
+        const i = Math.floor(r / tier);
+        const j = r % tier;
+        const hw = Math.floor((j + 1 + i * 1.4) * 0.72);
+        for (let x = cx - hw; x <= cx + hw; x++) {
+          let c = x > cx ? P.pineDark : P.pine;
+          // snow on each tier's top and drooping tips
+          if (j === 0 && Math.abs(x - cx) < hw) c = x > cx ? P.pineSnowShade : P.pineSnow;
+          else if (j === tier - 1 && Math.abs(x - cx) >= hw - 1 && x < cx) c = P.pineSnow;
           cv.set(x, y, c);
         }
       }
-      cv.rect(54, 51, 56, 57, COL.trunk);
+      cv.set(cx, top - 1, P.pineSnow);
+    }
 
-      lights.forEach((l, i) => {
-        let on;
-        if (lightMode === 0) on = l.on;
-        else if (lightMode === 1) on = (((Math.floor(t * 8) - i) % 6) + 6) % 6 < 3;
-        else on = true;
-        let c = LIGHT_COLORS[l.c];
-        if (lightMode === 2) c = mix(dim(c, 0.25), c, 0.5 + 0.5 * Math.sin(t * 2 + l.c));
-        cv.set(l.x, l.y, on ? c : dim(c, 0.18));
-      });
-
-      // star on top
-      const s = 0.5 + 0.5 * Math.sin(t * 3);
-      const sc = mix(COL.starDim, COL.starBright, s);
-      cv.set(TREE_X, 15, sc);
-      cv.rect(TREE_X - 1, 16, TREE_X + 1, 16, sc);
-      cv.set(TREE_X, 17, sc);
-      if (s > 0.8) {
-        cv.set(TREE_X - 2, 16, dim(sc, 0.6));
-        cv.set(TREE_X + 2, 16, dim(sc, 0.6));
-        cv.set(TREE_X, 14, dim(sc, 0.6));
+    function drawCabin(cv, P, day) {
+      const g = FAR[CABIN_X];
+      const cx = CABIN_X;
+      cv.rect(cx - 3, g - 5, cx + 3, g, P.cabin);
+      cv.rect(cx + 2, g - 5, cx + 3, g, P.cabinDark);
+      cv.rect(cx + 2, g - 11, cx + 3, g - 8, P.chimney);
+      cv.rect(cx + 2, g - 12, cx + 3, g - 12, P.roof);
+      // snowy roof with a dark outline so it reads against the sky
+      for (let r = 0; r < 4; r++) {
+        const y = g - 9 + r;
+        cv.rect(cx - 1 - r, y, cx + 1 + r, y, P.roof);
+        cv.set(cx - 2 - r, y, P.roofEdge);
+        cv.set(cx + 2 + r, y, P.roofEdge);
       }
-
-      // presents
-      cv.rect(47, 54, 50, 57, 0xb03030);
-      cv.rect(49, 54, 49, 57, 0xe8c547);
-      cv.rect(47, 55, 50, 55, 0xe8c547);
-      cv.set(48, 53, 0xe8c547);
-      cv.set(50, 53, 0xe8c547);
-      cv.rect(59, 53, 62, 57, 0x2f5fa8);
-      cv.rect(61, 53, 61, 57, 0xf2f2f2);
-      cv.rect(59, 55, 62, 55, 0xf2f2f2);
-      cv.set(60, 52, 0xf2f2f2);
-      cv.set(62, 52, 0xf2f2f2);
+      cv.rect(cx - 1, g - 10, cx + 1, g - 10, P.roofEdge);
+      cv.rect(cx - 5, g - 5, cx + 5, g - 5, P.roofEdge);
+      // door and glowing window
+      cv.rect(cx + 1, g - 3, cx + 1, g, P.door);
+      const flicker = 0.5 + 0.5 * Math.sin(t * 7) * Math.sin(t * 3.1);
+      const win = mix(WINDOW_LIT, WINDOW_HOT, flicker);
+      const night = 1 - day;
+      if (night > 0.05) {
+        for (let y = g - 6; y <= g + 1; y++) {
+          for (let x = cx - 5; x <= cx + 1; x++) {
+            const d = Math.hypot(x - (cx - 1.5), (y - (g - 2.5)) * 1.2);
+            if (d < 4) cv.blend(x, y, WINDOW_LIT, night * 0.22 * (1 - d / 4));
+          }
+        }
+      }
+      cv.rect(cx - 2, g - 3, cx - 1, g - 2, mix(mix(0x3a3020, WINDOW_LIT, 0.6), win, 0.35 + 0.65 * night));
     }
 
-    function drawCat(cv) {
-      let frame = Math.floor(t / 1.6) % 2 === 0 ? CAT_A : CAT_B;
-      if (catTail > 0) frame = CAT_TAIL_UP;
-      cv.sprite(frame, 6, 55, CAT_PAL);
+    function drawSnowman(cv, P) {
+      const cx = SNOWMAN_X;
+      const ground = NEAR[cx];
+      const balls = [
+        [ground - 4, 4.6],
+        [ground - 11, 3.6],
+        [ground - 17, 2.8],
+      ];
+      // arms behind the body
+      line(cv, cx - 3, ground - 11, cx - 8, ground - 15, P.stick);
+      cv.set(cx - 9, ground - 16, P.stick);
+      cv.set(cx - 8, ground - 17, P.stick);
+      line(cv, cx + 3, ground - 11, cx + 8, ground - 14, P.stick);
+      cv.set(cx + 9, ground - 15, P.stick);
+      cv.set(cx + 9, ground - 13, P.stick);
+      // outline first, one pixel bigger than each ball
+      for (const [cy, r] of balls) disc(cv, cx, cy, r + 1, P.snowmanLine);
+      for (const [cy, r] of balls) {
+        const rr = r * r + r * 0.6;
+        for (let y = Math.floor(cy - r); y <= Math.ceil(cy + r); y++) {
+          for (let x = Math.floor(cx - r); x <= Math.ceil(cx + r); x++) {
+            const dx = x - cx;
+            const dy = y - cy;
+            if (dx * dx + dy * dy > rr) continue;
+            const shaded = dx + dy * 0.6 > r * 0.45;
+            cv.set(x, y, shaded ? P.snowmanShade : P.snowman);
+          }
+        }
+      }
+      const hy = ground - 17; // head centre
+      // face
+      cv.set(cx - 1, hy - 1, P.coal);
+      cv.set(cx + 1, hy - 1, P.coal);
+      cv.rect(cx + 1, hy, cx + 3, hy, P.carrot);
+      cv.set(cx - 1, hy + 2, P.coal);
+      cv.set(cx, hy + 2, P.coal);
+      cv.set(cx + 1, hy + 2, P.coal);
+      // top hat
+      cv.rect(cx - 3, hy - 3, cx + 3, hy - 3, P.hat);
+      cv.rect(cx - 2, hy - 7, cx + 2, hy - 4, P.hat);
+      cv.rect(cx - 2, hy - 4, cx + 2, hy - 4, P.hatBand);
+      // scarf
+      cv.rect(cx - 3, hy + 3, cx + 3, hy + 4, P.scarf);
+      cv.rect(cx - 3, hy + 4, cx + 3, hy + 4, P.scarfDark);
+      cv.rect(cx - 3, hy + 5, cx - 2, hy + 8, P.scarf);
+      cv.set(cx - 2, hy + 8, P.scarfDark);
+      // buttons
+      cv.set(cx, ground - 12, P.coal);
+      cv.set(cx, ground - 9, P.coal);
     }
 
-    // Warm light from the fire spilling over the room.
-    function drawGlow(cv, day) {
-      const strength = fireLevel * 0.38 * (1 - 0.55 * day);
-      const cx = 31.5;
-      const cy = 50;
-      const r = 32;
-      for (let y = 14; y < 64; y++) {
-        for (let x = 0; x < 64; x++) {
-          if (x >= OPEN.x0 && x <= OPEN.x1 && y >= OPEN.y0 && y <= OPEN.y1) continue;
-          if (x >= SKY_BOX.x0 && x <= SKY_BOX.x1 && y >= SKY_BOX.y0 && y <= SKY_BOX.y1) continue;
-          const d = Math.hypot(x - cx, (y - cy) * 1.2);
-          if (d >= r) continue;
-          const k = 1 - d / r;
-          cv.blend(x, y, COL.glow, strength * k * k);
+    function drawHills(cv, P) {
+      for (let x = 0; x < 64; x++) {
+        for (let y = FAR[x]; y < MID[x]; y++) {
+          const shade = y - FAR[x] > 3 || hash(x, y, 7) === 0;
+          cv.set(x, y, shade ? P.snowFarShade : P.snowFar);
         }
       }
     }
 
-    function drawGlobe(cv) {
-      for (const p of globe) {
-        const fade = Math.min(1, (p.life - p.age) / 1.5);
-        cv.blend(p.x, p.y, COL.snow, 0.9 * fade);
+    function drawMid(cv, P) {
+      for (let x = 0; x < 64; x++) {
+        const slope = MID[Math.min(63, x + 1)] - MID[Math.max(0, x - 1)];
+        for (let y = MID[x]; y < NEAR[x]; y++) {
+          let c = P.snowMid;
+          if (y === MID[x]) c = P.snowMidRim;
+          else if ((slope > 0 && y - MID[x] < 4) || y >= NEAR[x] - 2 || hash(x, y, 9) === 0) c = P.snowMidShade;
+          cv.set(x, y, c);
+        }
+      }
+    }
+
+    function drawNear(cv, P, day) {
+      for (let x = 0; x < 64; x++) {
+        for (let y = NEAR[x]; y < 64; y++) {
+          let c = P.snowNear;
+          if (y === NEAR[x]) c = P.snowNearRim;
+          else if (y === NEAR[x] + 1 || hash(x, y, 11) === 0) c = P.snowNearShade;
+          cv.set(x, y, c);
+          if (hash(x, y, 61) === 0) {
+            const s = Math.sin(t * 2.5 + x * 1.7 + y);
+            if (s > 0.6) cv.blend(x, y, 0xffffff, (s - 0.6) * 2.2 * (0.4 + 0.6 * day));
+          }
+        }
       }
     }
 
     function draw(cv, ctx) {
       const hf = ctx.hourFloat;
       const day = daylight(hf);
+      const k = NIGHT_AMOUNT * (1 - day);
+      const P = {};
+      for (const key in BASE) P[key] = mix(NIGHT_PAL[key], BASE[key], day);
+      const flakeNear = mix(0xb4c2e0, 0xffffff, day);
+      const flakeFar = mix(0x8696bc, 0xe8f0ff, day);
 
-      drawRoom(cv, day);
-      drawWindow(cv, hf, day);
-      drawFireplace(cv);
-      drawTree(cv);
-      drawCat(cv);
-      drawGlow(cv, day);
-      drawGlobe(cv);
+      drawSky(cv, hf, day);
+      drawHills(cv, P);
+      drawCabin(cv, P, day);
+      for (const s of smoke) {
+        const a = 0.55 * (1 - s.age / s.life);
+        cv.blend(s.x, s.y, mix(SMOKE, NIGHT, k * 0.6), a);
+        if (s.age > 1) cv.blend(s.x + 1, s.y, mix(SMOKE, NIGHT, k * 0.6), a * 0.5);
+      }
+      for (const f of far) if (f.y < MID[clamp(Math.round(f.x), 0, 63)]) cv.blend(f.x, f.y, flakeFar, 0.55);
+      drawMid(cv, P);
+      for (const [x, h] of PINES) drawPine(cv, P, x, MID[x] + 2, h);
+      drawNear(cv, P, day);
+      drawSnowman(cv, P);
+      for (const f of near) cv.set(f.x, f.y, flakeNear);
+      for (const p of swirl) cv.blend(p.x, p.y, flakeNear, 0.9 * Math.min(1, (p.life - p.age) / 1.2));
 
-      PC.drawTime(cv, ctx.hours, ctx.minutes, {
-        y: 3,
-        color: COL.clock,
-        shadow: COL.clockShadow,
-        colon: ctx.ms < 500,
-        hour12: ctx.hour12,
-      });
+      PC.drawClock(cv, ctx, CLOCK, CLOCK_SHADOW);
     }
 
     return { update, draw };
   }
 
-  PC.registerTheme({ id: 'winter', name: 'Winter cabin', create });
-})(window.PixelClock);
+  PC.registerTheme({ id: 'winter', name: 'Snowy hills', kind: 'season', create });
+})(globalThis.PixelClock);

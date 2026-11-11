@@ -1,6 +1,6 @@
 # PixelClock
 
-A cozy 64×64 LED pixel-art desk clock with seasonal, animated themes: a crackling fireplace and twinkling tree in winter, a sky that follows the real time of day, and a snow-globe effect when you shake it.
+A cozy 64×64 LED pixel-art desk clock with animated themes for every season and major holiday. It switches themes by itself through the year, the sky follows the real time of day, and each theme has a surprise when you shake it.
 
 Built on an ESP32-S3 (Adafruit Matrix Portal S3) driving an RGB LED matrix. Every theme can be designed and previewed in a browser simulator before it goes on the hardware.
 
@@ -10,10 +10,40 @@ Built on an ESP32-S3 (Adafruit Matrix Portal S3) driving an RGB LED matrix. Ever
 
 Or open `simulator/index.html` in any browser. No install or build step is needed.
 
-- **Theme** and the ▲ ▼ buttons work like the two buttons on the real board.
+- **Theme** defaults to **Auto (by date)**, which picks the holiday or season for the date. The ▲ ▼ buttons work like the two buttons on the real board.
+- **Date** previews any day of the year, so you can see what the clock will show on Halloween or New Year's Eve.
 - **Time** scrubs through the day so you can preview sunrise, daytime, sunset and night. **Play a day** runs a full day in about 24 seconds.
 - **Diffuser** shows the soft glow you get with a smoked acrylic panel in front of the LEDs.
-- **Shake it** (or press <kbd>S</kbd>) triggers the snow globe. On the real clock this comes from the board's accelerometer.
+- **Shake it** (or press <kbd>S</kbd>) triggers the theme's shake effect. On the real clock this comes from the board's accelerometer.
+
+## Themes
+
+In auto mode the clock shows a holiday theme in the days around each holiday, and the season's theme the rest of the time.
+
+**Seasons**
+
+| Theme | Shown |
+|---|---|
+| Snowy hills | December–February |
+| Spring meadow | March–May |
+| Summer beach | June–August |
+| Autumn forest | September–November |
+
+**Holidays**
+
+| Theme | Shown |
+|---|---|
+| New Year's Eve | Dec 31–Jan 1 |
+| Lunar New Year | The day before to 3 days after (date varies; table covers 2025–2035) |
+| Valentine's Day | Feb 11–14 |
+| St. Patrick's Day | Mar 14–17 |
+| Easter | Thursday before Easter through Easter Sunday |
+| Fourth of July | Jul 1–4 |
+| Haunted hill (Halloween) | Oct 15–31 |
+| Harvest field (Thanksgiving) | The Monday before through Thanksgiving Day |
+| Christmas cabin | Dec 1–26 |
+
+The rules live in `simulator/schedule.js`, so changing a date window is a one-line edit.
 
 ## Hardware
 
@@ -44,26 +74,42 @@ The display is a 64×64 framebuffer of `0xRRGGBB` colours. A theme is a small mo
 - `update(dt, ctx)` runs 30 times a second and advances the animation (fire, snow, lights).
 - `draw(canvas, ctx)` paints the current frame.
 
-`ctx` carries the time of day, the 12/24-hour setting, and events like `shake`. The engine (`simulator/engine.js`) uses only integer colours and a deterministic xorshift RNG, so themes port directly to C++ on the ESP32.
+`ctx` carries the time of day, the date, the 12/24-hour setting, and events like `shake`. The engine (`simulator/engine.js`) uses only integer colours and a deterministic xorshift RNG, so themes port directly to C++ on the ESP32.
 
 ```
 simulator/
   index.html       simulator page
   main.js          render loop and controls (browser only)
-  engine.js        framebuffer, colour helpers, RNG, clock font
-  themes/
-    winter.js      winter cabin theme
+  engine.js        framebuffer, colours, RNG, clock font, sky, stars, fireworks
+  schedule.js      which theme to show on which date
+  themes/          one file per theme
+tools/
+  render.js        renders themes to PNG without a browser
 ```
+
+### Writing a theme
+
+1. Copy an existing theme in `simulator/themes/` and give it a new `id`, `name` and `kind` (`'season'` or `'holiday'`).
+2. Keep rows 0–13 calm: that's where the clock sits. Draw the clock last with `PC.drawClock(cv, ctx, color, shadow)`.
+3. Use the theme's `rng` for all randomness (never `Math.random`), so it behaves the same on the ESP32.
+4. Add a `<script>` tag for it in `simulator/index.html`. For a holiday, add its dates to `HOLIDAYS` in `schedule.js`.
+
+To preview themes without a browser:
+
+```bash
+node tools/render.js all --hour 21
+```
+
+That writes a contact sheet of every theme at 9 pm to `render-all.png`. You can also render one theme (`node tools/render.js halloween`), whatever auto mode picks on a date (`node tools/render.js auto --date 2026-12-31`), several frames in a row (`--frames 4`), or the shake effect (`--shake`).
 
 ## Roadmap
 
 - [x] Browser simulator
-- [x] Winter cabin theme: fireplace, tree, snow, sleeping cat, day/night sky
+- [x] A theme for each season and major holiday
+- [x] Auto-switch themes by date
+- [x] Simulator hosted on GitHub Pages
 - [ ] Firmware for the Matrix Portal S3 (Arduino + Adafruit Protomatter)
 - [ ] WiFi time sync (NTP)
-- [ ] Theme switching with the board buttons; snow globe with the accelerometer
-- [ ] More themes: autumn, spooky, spring, starry night
-- [ ] Auto-switch themes by date
+- [ ] Theme switching with the board buttons; shake effects with the accelerometer
 - [ ] Phone control page: theme, brightness, night dimming
 - [ ] Wiring photos and a printable frame
-- [x] Simulator hosted on GitHub Pages

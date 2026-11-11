@@ -178,6 +178,29 @@ button[aria-pressed="true"] {
   padding: 6px 0;
 }
 
+.auto-label {
+  flex-basis: 100%;
+  min-width: 0;
+  text-align: left;
+  padding-left: 96px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.auto-label:empty {
+  display: none;
+}
+
+input[type="date"] {
+  font: inherit;
+  color: var(--text);
+  background: #2a2229;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 5px 10px;
+  color-scheme: dark;
+}
+
 .hint {
   margin: 0;
   color: var(--muted);
