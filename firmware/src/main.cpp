@@ -42,6 +42,11 @@ static const int NIGHT_START = 23 * 60;  // dim between 11 pm ...
 static const int NIGHT_END = 6 * 60 + 30;  // ... and 6:30 am
 static const float NIGHT_DIM = 0.4f;
 static const float SHAKE_THRESHOLD = 7.0f;  // m/s^2 away from 1 g
+// How the panel is mounted, seen from the front. 0 = Adafruit's standard way (input
+// connector on the right). 1 = turned 90 degrees clockwise so the input connector is
+// at the bottom, which is how it sits in the 3D-printed case (case/README.md).
+// 2 and 3 are 180 and 270 degrees, in case you mount it another way.
+static const int PANEL_ROTATION = 1;
 constexpr int BIT_DEPTH = 6;
 constexpr real STEP = real(1) / 30;
 
@@ -108,9 +113,20 @@ static void present(float level) {
   uint32_t scale = sum > budget ? uint32_t(256.0f * budget / sum) : 256;
 
   uint16_t* buf = matrix.getBuffer();
-  for (int i = 0; i < W * H; i++) {
-    uint32_t r = out[i * 3] * scale >> 8, g = out[i * 3 + 1] * scale >> 8, b = out[i * 3 + 2] * scale >> 8;
-    buf[i] = uint16_t(((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3));
+  for (int ny = 0; ny < H; ny++) {
+    for (int nx = 0; nx < W; nx++) {
+      // (nx, ny) is the panel's own pixel; find which screen pixel it shows.
+      int sx, sy;
+      switch (PANEL_ROTATION & 3) {
+        case 1: sx = W - 1 - ny; sy = nx; break;          // panel turned 90 deg clockwise
+        case 2: sx = W - 1 - nx; sy = H - 1 - ny; break;  // 180 deg
+        case 3: sx = ny; sy = H - 1 - nx; break;          // 90 deg counter-clockwise
+        default: sx = nx; sy = ny; break;
+      }
+      int i = sy * W + sx;
+      uint32_t r = out[i * 3] * scale >> 8, g = out[i * 3 + 1] * scale >> 8, b = out[i * 3 + 2] * scale >> 8;
+      buf[ny * W + nx] = uint16_t(((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3));
+    }
   }
   matrix.show();
 }

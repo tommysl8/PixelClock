@@ -11,6 +11,11 @@ desktop.ini
 .pio/
 firmware/.venv/
 firmware/native/build/
+
+# Case tools and downloaded reference models
+case/.venv/
+case/reference/
+__pycache__/
 build/
 *.bin
 *.elf

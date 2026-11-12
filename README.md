@@ -51,27 +51,26 @@ All from Adafruit, which only guarantees its own panels with the Matrix Portal.
 
 | Part | Notes | Price |
 |---|---|---|
-| [Adafruit Matrix Portal S3](https://www.adafruit.com/product/5778) (PID 5778) | ESP32-S3 with WiFi, 2 buttons, accelerometer, USB-C. Plugs straight onto the panel. The PCB-antenna version. | $19.95 |
+| [Adafruit Matrix Portal S3](https://www.adafruit.com/product/5778) (PID 5778) | ESP32-S3 with WiFi, 2 buttons, accelerometer, USB-C. The PCB-antenna version. | $19.95 |
 | [64x64 RGB LED Matrix Panel, 2.5mm pitch, 45° curb-cut](https://www.adafruit.com/product/5407) (PID 5407) | 160 × 160 mm, 1/32 scan, 5 address lines. Includes the power cable and ribbon cable. "Curb-cut" only means the edges are bevelled. | $54.95 |
 | [Official Raspberry Pi USB-C power supply, 5.1V 3A](https://www.adafruit.com/product/4298) (PID 4298) | Thick 1.5 m 18 AWG cable, US plug. The firmware's power limit keeps the clock well under 3A. | $8.74 |
-| [Adjustable bent-wire stand](https://www.adafruit.com/product/1679) (PID 1679) | Holds the panel upright on a desk | $4.95 |
+| [Adafruit STEMMA Speaker](https://www.adafruit.com/product/3885) (PID 3885) | Speaker with its own amplifier and volume knob, for the alarm and sounds | $5.95 |
+| [JST PH 3-pin plug-plug cable, 100 mm](https://www.adafruit.com/product/4336) (PID 4336) | Connects the speaker to the board's A0 port. Pick "Plug-Plug Cable - 100mm long". | $0.75 |
+| [Black Nylon Machine Screw and Stand-off Set, M3](https://www.adafruit.com/product/4685) (PID 4685) | Screws and nuts for the 3D-printed case: 4 × M3×6, 8 × M3×10, 8 nuts | $16.95 |
 | [USB-A to USB-C cable, 1 m](https://www.adafruit.com/product/4474) (PID 4474) | For flashing from a PC. Skip it if you already have a USB-C *data* cable. | $4.95 |
 | Optional: [black LED diffusion acrylic, 12" × 12"](https://www.adafruit.com/product/4594) (PID 4594) | Cuts glare and sharpens pixels. Has to be cut to 160 × 160 mm with a laser cutter or saw. | $9.95 |
 
-Prices and stock as checked on Adafruit in November 2026. Adafruit's 2 mm 64×64 panel (PID 5362, 128 mm) also works with this firmware if it's back in stock.
+Prices and stock as checked on Adafruit in November 2026. Adafruit's 2 mm 64×64 panel (PID 5362, 128 mm) also works with the firmware if it's back in stock, but the case is designed for the 160 mm curb-cut panel.
 
-You also need a soldering iron for one solder blob (see Wiring).
+You also need a soldering iron for one solder blob, a 3D printer for [the case](case/), and a small Phillips screwdriver.
 
-Finished size is about 16 cm square, plus a frame if you add one.
+## Case and assembly
 
-## Wiring
+The [3D-printable case](case/) puts the display in a thin 3.5 mm border and hides the board and speaker in a foot behind it. Only one USB-C cable leaves the back. The display is 167 mm square, and the clock is 107 mm deep with the foot.
 
-1. Plug the Matrix Portal S3 onto the panel's **input** HUB75 connector (the arrows printed on the panel point away from the input).
-2. Screw the panel's power cable into the Matrix Portal's screw terminals: red to `+`, black to `−`.
-3. Close the **address E** jumper on the bottom of the Matrix Portal with a small blob of solder, so the middle pad connects to the pad marked **8**. 64×64 panels need this extra address line, and pin 8 is right for Adafruit's 64×64 panels. It's the only soldering in the project.
-4. Connect the Raspberry Pi USB-C power supply.
+The fit was checked against Adafruit's own 3D models of every part. [case/README.md](case/README.md) has the print settings, step-by-step assembly and the verification details.
 
-Photos and a step-by-step guide will be added once the build is done.
+**Bench test without the case:** plug the Matrix Portal straight onto the panel's input connector, with the arrows on the panel pointing up and right as seen from the back. Set `PANEL_ROTATION` to `0` in `firmware/src/main.cpp` while you test. The case uses `1`.
 
 ## Firmware
 
@@ -183,4 +182,6 @@ That writes a contact sheet of every theme at 9 pm to `render-all.png`. You can 
 - [x] Brightness levels, night dimming and a power limit
 - [ ] Tune colours and gamma on the real panel
 - [ ] Phone control page: theme, brightness, night dimming
-- [ ] Wiring photos and a printable frame
+- [x] 3D-printable case, fit-checked against Adafruit's models
+- [ ] Alarm with sounds (speaker hardware is in the case)
+- [ ] Build photos
