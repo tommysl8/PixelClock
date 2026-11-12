@@ -80,6 +80,9 @@ def overlap_volume(a, b):
 
 
 def main():
+    if "--no-acrylic" in sys.argv:
+        pc.configure(acrylic=False)
+    print("checking the build", "WITH the diffusion acrylic" if pc.ACRYLIC else "WITHOUT acrylic")
     panel_path = fetch()
     gmsh.initialize()
     gmsh.option.setNumber("General.Terminal", 0)
@@ -101,11 +104,15 @@ def main():
     # model: LED face at z=-84 facing -z, back at z=-69 -> assembly: Y = z + 84, panel centred at (0, PANEL_CZ)
     occ.rotate([keep], 0, 0, 0, 1, 0, 0, math.pi / 2)
     occ.rotate([keep], 0, 0, 0, 0, 0, 1, math.pi)
-    occ.translate([keep], 0, 84, pc.PANEL_CZ)
+    occ.translate([keep], 0, 84 + pc.PANEL_FRONT_Y, pc.PANEL_CZ)
     occ.synchronize()
     pb = bbox(keep)
     print("panel model placed: X %.2f..%.2f  Y %.2f..%.2f  Z %.2f..%.2f" % (pb[0], pb[3], pb[1], pb[4], pb[2], pb[5]))
     components = {"panel": [keep]}
+    if pc.ACRYLIC:
+        # 160 x 160 x 2.6 mm sheet on the LED face, its front flush with the frame
+        components["acrylic"] = [(3, occ.addBox(-pc.PANEL_W / 2, 0, pc.PANEL_CZ - pc.PANEL_W / 2,
+                                                pc.PANEL_W, pc.ACRYLIC_T, pc.PANEL_W))]
 
     # ---- Matrix Portal S3: board coords -> X = X0 + by, Y = EDGE - bx, Z = BOARD_Z + bz ----
     board = import_step(os.path.join(REF, "board.step"))
@@ -174,6 +181,8 @@ def main():
         ("panel shifted 0.6 mm sideways (frame must hit it)", components["panel"], ["display"], (0.6, 0, 0)),
         ("panel pushed 0.3 mm back (screw bosses must hit it)", components["panel"], ["display"], (0, 0.3, 0)),
     ]
+    if pc.ACRYLIC:
+        tests.append(("acrylic shifted 0.6 mm sideways (frame must hit it)", components["acrylic"], ["display"], (0.6, 0, 0)))
     for label, tags, pnames, (dx, dy, dz) in tests:
         occ.translate(tags, dx, dy, dz)
         caught = collides(pnames, tags)
@@ -189,7 +198,10 @@ def main():
         problems += 0 if hit else 1
     o = pc.PANEL_W / 2 + pc.GAP
     print(f"  panel front board 160.0 mm in a {2*o:.1f} mm opening: {pc.GAP:.2f} mm per side")
-    print(f"  panel back face at Y={pc.PANEL_DEPTH}, screw bosses end at Y={pc.PANEL_DEPTH}: LED face flush with the front")
+    front = "acrylic face" if pc.ACRYLIC else "LED face"
+    print(f"  panel back face at Y={pc.PANEL_BACK_Y:.1f}, screw bosses end at Y={pc.PANEL_BACK_Y:.1f}: {front} flush with the front")
+    if pc.ACRYLIC:
+        print(f"  acrylic 160.0 mm in the same {2*o:.1f} mm opening, {pc.ACRYLIC_T} mm deep in front of the LEDs")
     print(f"  M3x6 screw: {pc.PANEL_SCREW_FLOOR:.1f} mm floor + {6 - pc.PANEL_SCREW_FLOOR:.1f} mm into the insert (insert hole 10 mm deep)")
     hdr_top = pc.BOARD_Z + pc.BOARD_TALLEST
     print(f"  board header top Z={hdr_top:.2f}, lid underside Z={pc.FOOT_TOP:.2f}: {pc.FOOT_TOP - hdr_top:.2f} mm for the ribbon plug")
@@ -255,9 +267,9 @@ def main():
     for x, z in pc.PANEL_SCREWS:
         zz = pc.PANEL_CZ + z
         zone_tests.append((f"M3x6 shank, panel screw ({x:+.0f}, {z:+.0f})",
-                           (lambda x=x, zz=zz: pc.cyl_y(x, zz, pc.PANEL_DEPTH - 4.0, pc.PANEL_DEPTH + pc.PANEL_SCREW_FLOOR + 0.01, 3.0)), ["display"]))
+                           (lambda x=x, zz=zz: pc.cyl_y(x, zz, pc.PANEL_BACK_Y - 4.0, pc.PANEL_BACK_Y + pc.PANEL_SCREW_FLOOR + 0.01, 3.0)), ["display"]))
         zone_tests.append((f"M3 pan head + driver, panel screw ({x:+.0f}, {z:+.0f})",
-                           (lambda x=x, zz=zz: pc.cyl_y(x, zz, pc.PANEL_DEPTH + pc.PANEL_SCREW_FLOOR + 0.01, pc.CAVITY_BACK + pc.BACK_T + 5, 6.0)), ["display"]))
+                           (lambda x=x, zz=zz: pc.cyl_y(x, zz, pc.PANEL_BACK_Y + pc.PANEL_SCREW_FLOOR + 0.01, pc.CAVITY_BACK + pc.BACK_T + 5, 6.0)), ["display"]))
 
     for label, zone_def, pnames in zone_tests:
         if callable(zone_def):

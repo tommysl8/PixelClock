@@ -32,6 +32,7 @@ BOARD_COLOR = (0.10, 0.10, 0.10)
 METAL = (0.70, 0.70, 0.72)
 SPEAKER_COLOR = (0.15, 0.15, 0.16)
 PANEL_COLOR = (0.08, 0.08, 0.08)
+ACRYLIC_COLOR = (0.05, 0.05, 0.06)
 
 
 def mesh_tris(tags, size=6.0, curv=10):
@@ -77,6 +78,16 @@ def clock_frame():
         return np.array(json.loads(out), dtype=np.uint32).reshape(64, 64)
     except Exception:
         return None
+
+
+def box_tris(x0, x1, y0, y1, z0, z1):
+    """Triangles for an axis-aligned box (used for the acrylic sheet)."""
+    p = np.array([[x, y, z] for x in (x0, x1) for y in (y0, y1) for z in (z0, z1)], float)
+    faces = [(0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3)]
+    tris = []
+    for a, b, c, d in faces:
+        tris += [[p[a], p[b], p[c]], [p[a], p[c], p[d]]]
+    return np.array(tris)
 
 
 def led_quads(px):
@@ -195,11 +206,13 @@ def main():
     occ.remove([d for d in vols if d not in keep], recursive=True)
     occ.rotate(keep, 0, 0, 0, 1, 0, 0, math.pi / 2)
     occ.rotate(keep, 0, 0, 0, 0, 0, 1, math.pi)
-    occ.translate(keep, 0, 84, pc.PANEL_CZ)
+    occ.translate(keep, 0, 84 + pc.PANEL_FRONT_Y, pc.PANEL_CZ)
     tris["panel"] = mesh_tris(keep, size=6.0, curv=8)
     gmsh.finalize()
 
     leds, led_cols = led_quads(clock_frame())
+    half = pc.PANEL_W / 2
+    acrylic = box_tris(-half, half, 0, pc.ACRYLIC_T, pc.PANEL_CZ - half, pc.PANEL_CZ + half) if pc.ACRYLIC else np.zeros((0, 3, 3))
 
     def shifted(t, dy=0.0, dz=0.0):
         t = t.copy()
@@ -212,6 +225,7 @@ def main():
         (tris["foot"], CASE_COLOR, False),
         (tris["lid"], LID_COLOR, False),
         (tris["panel"], PANEL_COLOR, False),
+        (acrylic, ACRYLIC_COLOR, False),
         (tris["board"], BOARD_COLOR, False),
         (tris["speaker"], SPEAKER_COLOR, False),
         (leds, led_cols, True),
@@ -223,8 +237,9 @@ def main():
            (1.0, 0.0001, 0.0), "side.png", "Side view", size=(9, 5))
     exploded = [
         (tris["display"], CASE_COLOR, False),
-        (shifted(tris["panel"], dy=-70), PANEL_COLOR, False),
-        (shifted(leds, dy=-70), led_cols, True),
+        (shifted(acrylic, dy=-40), ACRYLIC_COLOR, False),
+        (shifted(tris["panel"], dy=-75), PANEL_COLOR, False),
+        (shifted(leds, dy=-75 + pc.PANEL_FRONT_Y), led_cols, True),
         (shifted(tris["foot"], dy=45), CASE_COLOR, False),
         (shifted(tris["board"], dy=45, dz=35), BOARD_COLOR, False),
         (shifted(tris["speaker"], dy=45, dz=35), SPEAKER_COLOR, False),

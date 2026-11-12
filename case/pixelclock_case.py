@@ -70,8 +70,13 @@ SPK_TRIM = (22.99, 3.05)          # volume trimpot centre (sx, sy)
 # --------------------------------------------------------------------------
 WALL = 3.0                # display frame walls
 GAP = 0.5                 # clearance around the panel's front board, per side
-CAVITY_BACK = 33.0        # inner face of the display back wall (room for cables)
+CABLE_ROOM = 18.0         # behind the panel's back face, for its connectors and cables
 BACK_T = 3.0              # display back wall
+
+# Optional diffusion acrylic in front of the LEDs: Adafruit Black LED Diffusion Acrylic
+# (PID 4594), 0.1" / 2.6 mm thick, cut to the panel size (160 x 160 mm). With it, the
+# panel sits 2.6 mm deeper so the acrylic's face is flush with the front of the frame.
+ACRYLIC_T = 2.6
 DISPLAY_OUT = PANEL_W / 2 + GAP + WALL          # 83.5: half width of the display
 PANEL_CZ = WALL + GAP + PANEL_W / 2             # 83.5: panel centre height
 CORNER_R = 6.0            # rounded outside corners of the display
@@ -84,7 +89,6 @@ PANEL_SCREWS = [(sx * 61.0, sy * 45.0) for sx in (-1, 1) for sy in (-1, 1)]
 
 WINDOW = (-16.0, 16.0, 8.0, 30.0)   # cable window between display and foot (x0, x1, z0, z1)
 
-FOOT_Y0 = CAVITY_BACK + BACK_T     # 36: foot front face sits on the display back
 FOOT_WALL = 3.0                    # foot front wall
 FOOT_SIDE = 2.5                    # other foot walls and floor
 FOOT_IN_X = 48.0                   # inner half width
@@ -95,13 +99,12 @@ FOOT_R = 4.0
 BOARD_POST_H = 7.0                 # clears the 5.55 mm socket under the board
 FLOOR_TOP = FOOT_SIDE
 BOARD_Z = FLOOR_TOP + BOARD_POST_H                  # PCB bottom
-BOARD_EDGE_Y = 107.0                                # board edge with the USB port
+BOARD_EDGE_FROM_FOOT = 71.0                         # foot front face to the board's USB edge
 BOARD_EDGE_INSET = 0.4                              # edge sits this far inside the back face
-FOOT_Y1 = BOARD_EDGE_Y + BOARD_EDGE_INSET           # 107.4: back face of the foot
 BOARD_X0 = -5.45                                    # board 'y' axis runs along +X from here
 
 SPK_X0 = -39.0
-SPK_Y0 = 66.0   # speaker JST faces the front; leaves ~11 mm in front of it for the plug
+SPK_FROM_FOOT = 30.0   # speaker JST faces the front; leaves ~11 mm in front of it for the plug
 SPK_Z = FOOT_TOP - 1.5 - SPK_HEIGHT                 # speaker PCB bottom; cone 1.5 mm under the lid
 
 PIN_D_BOARD = 2.2          # in 2.5 mm holes
@@ -112,11 +115,31 @@ PRESS_GAP = 0.2            # lid posts stop this far above the boards
 # (X, Z) of the M3x10 screws joining foot and display. Kept outside the ribbon's path
 # (board header spans X 2.8..30.8) and below the lid's nut slots (Z 25.1..27.9).
 JOINT_SCREWS = [(-36.0, 7.0), (36.0, 7.0), (-36.0, 20.0), (36.0, 20.0)]
-LID_SCREWS = [(sx * 44.5, y) for sx in (-1, 1) for y in (FOOT_Y0 + FOOT_WALL + 4.5, FOOT_Y1 - FOOT_SIDE - 4.5)]
 LID_BOSS_D = 8.0           # 1.15 mm walls each side of the 5.7 mm nut slot
 
 NUT_AF = 5.7               # M3 nut across flats (5.5) + clearance
 NUT_T = 2.7                # M3 nut thickness (2.4) + clearance
+
+
+def configure(acrylic=True):
+    """Set the depth stack-up for a build with or without the diffusion acrylic.
+
+    Everything behind the panel moves back with it, so the foot and lid are the same
+    shape either way; only the display part changes.
+    """
+    global ACRYLIC, PANEL_FRONT_Y, PANEL_BACK_Y, CAVITY_BACK, FOOT_Y0, BOARD_EDGE_Y, FOOT_Y1, SPK_Y0, LID_SCREWS
+    ACRYLIC = acrylic
+    PANEL_FRONT_Y = ACRYLIC_T if acrylic else 0.0       # LED face (acrylic sits in front of it)
+    PANEL_BACK_Y = PANEL_FRONT_Y + PANEL_DEPTH          # where the screw bosses meet the panel
+    CAVITY_BACK = PANEL_BACK_Y + CABLE_ROOM             # inner face of the display back wall
+    FOOT_Y0 = CAVITY_BACK + BACK_T                      # foot front face sits on the display back
+    BOARD_EDGE_Y = FOOT_Y0 + BOARD_EDGE_FROM_FOOT       # board edge with the USB port
+    FOOT_Y1 = BOARD_EDGE_Y + BOARD_EDGE_INSET           # back face of the foot
+    SPK_Y0 = FOOT_Y0 + SPK_FROM_FOOT
+    LID_SCREWS = [(sx * 44.5, y) for sx in (-1, 1) for y in (FOOT_Y0 + FOOT_WALL + 4.5, FOOT_Y1 - FOOT_SIDE - 4.5)]
+
+
+configure(acrylic=True)
 
 # ---- derived board placement (board coords bx, by, bz -> assembly X, Y, Z) ----
 def board_xyz(bx, by, bz=0.0):
@@ -192,7 +215,9 @@ def cut(obj, tools):
 # Parts
 # --------------------------------------------------------------------------
 def build_display():
-    """Frame + back wall that the panel sits in, LED face flush with the front."""
+    """Frame + back wall that the panel sits in. The front of the frame is flush with the
+    acrylic (or with the LED face when built without acrylic). The acrylic is the same
+    size as the panel and shares its 161 mm opening."""
     o = DISPLAY_OUT
     top = PANEL_CZ + PANEL_W / 2 + GAP + WALL  # 167
     shell = rbox_y(-o, o, 0, CAVITY_BACK + BACK_T, 0, top, CORNER_R)
@@ -200,14 +225,14 @@ def build_display():
     body = cut(shell, [inner])
 
     # bosses the panel screws through, touching the panel back face (Y = 15)
-    bosses = [cyl_y(x, PANEL_CZ + z, PANEL_DEPTH, CAVITY_BACK + 0.01, PANEL_BOSS_OD) for x, z in PANEL_SCREWS]
+    bosses = [cyl_y(x, PANEL_CZ + z, PANEL_BACK_Y, CAVITY_BACK + 0.01, PANEL_BOSS_OD) for x, z in PANEL_SCREWS]
     body = fuse(body + bosses)
 
     tools = []
     for x, z in PANEL_SCREWS:
         zz = PANEL_CZ + z
-        tools.append(cyl_y(x, zz, PANEL_DEPTH - 1, CAVITY_BACK + BACK_T + 1, PANEL_SCREW_HOLE))
-        tools.append(cyl_y(x, zz, PANEL_DEPTH + PANEL_SCREW_FLOOR, CAVITY_BACK + BACK_T + 1, PANEL_SCREW_BORE))
+        tools.append(cyl_y(x, zz, PANEL_BACK_Y - 1, CAVITY_BACK + BACK_T + 1, PANEL_SCREW_HOLE))
+        tools.append(cyl_y(x, zz, PANEL_BACK_Y + PANEL_SCREW_FLOOR, CAVITY_BACK + BACK_T + 1, PANEL_SCREW_BORE))
     # cable window into the foot
     x0, x1, z0, z1 = WINDOW
     tools.append(box(x0, x1, CAVITY_BACK - 1, CAVITY_BACK + BACK_T + 1, z0, z1))
@@ -348,38 +373,48 @@ def build(name):
     return tags
 
 
+def export_part(out_dir, name, filename):
+    gmsh.clear()
+    gmsh.model.add(filename)
+    tags = build(name)
+    gmsh.write(os.path.join(out_dir, "step", f"{filename}.step"))
+    pose = PRINT_POSE[name]
+    if pose:
+        occ.rotate(tags, 0, 0, 0, *pose[0], pose[1])
+    occ.synchronize()
+    bb = gmsh.model.getBoundingBox(-1, -1)
+    occ.translate(tags, -(bb[0] + bb[3]) / 2, -(bb[1] + bb[4]) / 2, -bb[2])
+    occ.synchronize()
+    gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 36)
+    gmsh.option.setNumber("Mesh.MeshSizeMax", 4.0)
+    gmsh.option.setNumber("Mesh.MeshSizeMin", 0.05)
+    gmsh.option.setNumber("Mesh.Algorithm", 6)
+    gmsh.option.setNumber("Mesh.Binary", 1)
+    gmsh.model.mesh.generate(2)
+    gmsh.write(os.path.join(out_dir, "stl", f"{filename}.stl"))
+    bb = gmsh.model.getBoundingBox(-1, -1)
+    print(f"{filename:32s} print size {bb[3]-bb[0]:.1f} x {bb[4]-bb[1]:.1f} x {bb[5]-bb[2]:.1f} mm")
+
+
 def export(out_dir):
     init()
     os.makedirs(os.path.join(out_dir, "stl"), exist_ok=True)
     os.makedirs(os.path.join(out_dir, "step"), exist_ok=True)
+
+    configure(acrylic=True)
     # assembly STEP with all parts in place
     gmsh.clear()
     gmsh.model.add("assembly")
     for name in PARTS:
         build(name)
     gmsh.write(os.path.join(out_dir, "step", "pixelclock_case_assembly.step"))
-
     for name in PARTS:
-        gmsh.clear()
-        gmsh.model.add(name)
-        tags = build(name)
-        gmsh.write(os.path.join(out_dir, "step", f"pixelclock_{name}.step"))
-        pose = PRINT_POSE[name]
-        if pose:
-            occ.rotate(tags, 0, 0, 0, *pose[0], pose[1])
-        occ.synchronize()
-        bb = gmsh.model.getBoundingBox(-1, -1)
-        occ.translate(tags, -(bb[0] + bb[3]) / 2, -(bb[1] + bb[4]) / 2, -bb[2])
-        occ.synchronize()
-        gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 36)
-        gmsh.option.setNumber("Mesh.MeshSizeMax", 4.0)
-        gmsh.option.setNumber("Mesh.MeshSizeMin", 0.05)
-        gmsh.option.setNumber("Mesh.Algorithm", 6)
-        gmsh.option.setNumber("Mesh.Binary", 1)
-        gmsh.model.mesh.generate(2)
-        gmsh.write(os.path.join(out_dir, "stl", f"pixelclock_{name}.stl"))
-        bb = gmsh.model.getBoundingBox(-1, -1)
-        print(f"{name:8s} print size {bb[3]-bb[0]:.1f} x {bb[4]-bb[1]:.1f} x {bb[5]-bb[2]:.1f} mm")
+        export_part(out_dir, name, f"pixelclock_{name}")
+
+    # The foot and lid are identical either way; only the display part changes.
+    configure(acrylic=False)
+    export_part(out_dir, "display", "pixelclock_display_no_acrylic")
+    configure(acrylic=True)
 
 
 if __name__ == "__main__":

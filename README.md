@@ -66,7 +66,7 @@ You also need a soldering iron for one solder blob, a 3D printer for [the case](
 
 ## Case and assembly
 
-The [3D-printable case](case/) puts the display in a thin 3.5 mm border and hides the board and speaker in a foot behind it. Only one USB-C cable leaves the back. The display is 167 mm square, and the clock is 107 mm deep with the foot.
+The [3D-printable case](case/) puts the display in a thin 3.5 mm border and hides the board and speaker in a foot behind it. Only one USB-C cable leaves the back. The display is 167 mm square, and the clock is 110 mm deep with the foot. The optional diffusion acrylic sits flush in the frame in front of the LEDs, and there's also a version of the display part for building without it.
 
 The fit was checked against Adafruit's own 3D models of every part. [case/README.md](case/README.md) has the print settings, step-by-step assembly and the verification details.
 
