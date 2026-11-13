@@ -8,61 +8,69 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <main>
-    <header>
-      <h1>PixelClock</h1>
-      <p>A 64×64 LED desk clock. This is a live simulator of the real display.</p>
-    </header>
-
-    <section class="stage">
-      <div id="frame" class="frame diffused">
-        <canvas id="display" role="img" aria-label="Simulated 64 by 64 LED clock display"></canvas>
-      </div>
-      <div class="stand" aria-hidden="true"></div>
-    </section>
-
-    <section class="controls">
-      <div class="row">
-        <label for="theme">Theme</label>
-        <select id="theme"></select>
-        <div class="board-buttons" title="The two buttons on the Matrix Portal S3">
-          <button id="btn-up" aria-label="Board button up: next theme">▲</button>
-          <button id="btn-down" aria-label="Board button down: previous theme">▼</button>
+  <main class="app">
+    <section class="stage" aria-label="Clock">
+      <div class="clock">
+        <div id="frame" class="frame diffused">
+          <canvas id="display" role="img" aria-label="Simulated 64 by 64 LED clock display"></canvas>
         </div>
-        <output id="auto-label" class="auto-label"></output>
+        <div class="stand" aria-hidden="true"></div>
       </div>
-
-      <div class="row">
-        <label for="date">Date</label>
-        <input type="date" id="date">
-        <button id="today">Today</button>
-      </div>
-
-      <div class="row">
-        <label for="time">Time</label>
-        <input type="range" id="time" min="0" max="1439" step="1">
-        <output id="time-label">--:--</output>
-      </div>
-
-      <div class="row toggles">
-        <label class="check"><input type="checkbox" id="live" checked> Live time</label>
-        <button id="play-day">Play a day</button>
-        <label class="check"><input type="checkbox" id="hour12" checked> 12-hour</label>
-      </div>
-
-      <div class="row">
-        <label for="brightness">Brightness</label>
-        <input type="range" id="brightness" min="10" max="100" step="1" value="100">
-        <output id="brightness-label">100%</output>
-      </div>
-
-      <div class="row toggles">
-        <label class="check"><input type="checkbox" id="diffuser" checked> Diffuser</label>
-        <button id="shake">Shake it</button>
-      </div>
-
-      <p class="hint">Keys: <kbd>S</kbd> shake, <kbd>↑</kbd> <kbd>↓</kbd> change theme, <kbd>T</kbd> 12/24-hour</p>
     </section>
+
+    <aside class="panel" aria-label="Controls">
+      <header>
+        <h1>PixelClock</h1>
+        <p>A live simulator of the 64×64 LED desk clock.</p>
+      </header>
+
+      <section class="group">
+        <div class="group-head"><label for="theme">Theme</label></div>
+        <div class="row">
+          <select id="theme"></select>
+          <div class="board-buttons" title="The two buttons on the Matrix Portal S3">
+            <button id="btn-up" aria-label="Board button up: next theme">▲</button>
+            <button id="btn-down" aria-label="Board button down: previous theme">▼</button>
+          </div>
+        </div>
+        <output id="auto-label" class="note"></output>
+      </section>
+
+      <section class="group">
+        <div class="group-head"><label for="date">Date</label></div>
+        <div class="row">
+          <input type="date" id="date">
+          <button id="today">Today</button>
+        </div>
+      </section>
+
+      <section class="group">
+        <div class="group-head">
+          <label for="time">Time</label>
+          <output id="time-label">--:--</output>
+        </div>
+        <input type="range" id="time" min="0" max="1439" step="1">
+        <div class="row">
+          <label class="check"><input type="checkbox" id="live" checked> Live time</label>
+          <label class="check"><input type="checkbox" id="hour12" checked> 12-hour</label>
+          <button id="play-day">Play a day</button>
+        </div>
+      </section>
+
+      <section class="group">
+        <div class="group-head">
+          <label for="brightness">Brightness</label>
+          <output id="brightness-label">100%</output>
+        </div>
+        <input type="range" id="brightness" min="10" max="100" step="1" value="100">
+        <div class="row">
+          <label class="check"><input type="checkbox" id="diffuser" checked> Diffuser</label>
+          <button id="shake">Shake it</button>
+        </div>
+      </section>
+
+      <p class="hint">Keys: <kbd>S</kbd> shake, <kbd>↑</kbd> <kbd>↓</kbd> theme, <kbd>T</kbd> 12/24-hour</p>
+    </aside>
   </main>
 
   <script src="engine.js"></script>

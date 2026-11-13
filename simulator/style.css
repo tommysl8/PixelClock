@@ -1,12 +1,17 @@
 :root {
   --bg: #141016;
   --panel: #1d181f;
+  --field: #2a2229;
   --line: #3a3138;
   --text: #ece4d8;
   --muted: #a99d91;
   --accent: #ff9a3c;
   --wood: #6b4428;
   --wood-dark: #4a2e1a;
+  --pad: 24px;          /* space around the whole layout */
+  --panel-w: 320px;     /* width of the controls column */
+  --stand: 10px;
+  --led: 7px;           /* size of one LED on screen; main.js keeps this current */
   color-scheme: dark;
 }
 
@@ -14,44 +19,54 @@
   box-sizing: border-box;
 }
 
+html,
+body {
+  height: 100%;
+}
+
 body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
-main {
-  max-width: 560px;
+/* ---------- layout: clock on the left, controls on the right ---------- */
+.app {
+  height: 100vh;
+  height: 100dvh;
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 32px 16px 48px;
+  padding: var(--pad);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--panel-w);
+  gap: 28px;
 }
 
-header h1 {
-  margin: 0;
-  font-size: 26px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-}
-
-header p {
-  margin: 4px 0 24px;
-  color: var(--muted);
-}
-
-/* ---------- the clock ---------- */
 .stage {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* The clock is a square sized to whichever is smaller: the column's width or the
+   window's height (minus padding and the stand), so it never needs scrolling. */
+.clock {
+  width: min(100%, calc(100vh - 2 * var(--pad) - var(--stand) - 8px));
+  width: min(100%, calc(100dvh - 2 * var(--pad) - var(--stand) - 8px));
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 
 .frame {
+  width: 100%;
   border: 14px solid var(--wood);
   border-radius: 8px;
   background: #000;
   line-height: 0;
-  width: min(100%, 476px);
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
   overflow: hidden;
 }
@@ -65,12 +80,12 @@ header p {
 }
 
 .frame.diffused #display {
-  filter: blur(2.4px) saturate(1.25) brightness(1.25);
+  filter: blur(calc(var(--led) * 0.34)) saturate(1.25) brightness(1.25);
 }
 
 .stand {
   width: 46%;
-  height: 10px;
+  height: var(--stand);
   background: var(--wood-dark);
   border-radius: 0 0 6px 6px;
 }
@@ -93,47 +108,74 @@ header p {
   }
 }
 
-/* ---------- controls ---------- */
-.controls {
-  margin-top: 28px;
+/* ---------- controls panel ---------- */
+.panel {
+  align-self: center;
+  max-height: 100%;
+  overflow-y: auto; /* only scrolls in very short windows; the page itself never does */
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 16px 18px;
-  display: grid;
-  gap: 14px;
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.panel header h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.panel header p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.group-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.group-head label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.group-head output {
+  font-variant-numeric: tabular-nums;
 }
 
 .row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
-.row > label:first-child {
-  width: 84px;
-  color: var(--muted);
+.row select,
+.row input[type="date"] {
+  flex: 1;
+  min-width: 0;
 }
 
-.row input[type="range"] {
-  flex: 1;
-  min-width: 140px;
+input[type="range"] {
+  width: 100%;
+  margin: 0;
   accent-color: var(--accent);
-}
-
-.row select {
-  flex: 1;
-}
-
-output {
-  min-width: 64px;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
-.toggles {
-  gap: 18px;
 }
 
 .check {
@@ -145,21 +187,37 @@ output {
 
 .check input {
   accent-color: var(--accent);
+  margin: 0;
+}
+
+.row button:last-child {
+  margin-left: auto;
+}
+
+button,
+select,
+input[type="date"] {
+  font: inherit;
+  color: var(--text);
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 12px;
 }
 
 button,
 select {
-  font: inherit;
-  color: var(--text);
-  background: #2a2229;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 6px 12px;
   cursor: pointer;
 }
 
+input[type="date"] {
+  padding: 5px 10px;
+  color-scheme: dark;
+}
+
 button:hover,
-select:hover {
+select:hover,
+input[type="date"]:hover {
   border-color: var(--accent);
 }
 
@@ -178,39 +236,71 @@ button[aria-pressed="true"] {
   padding: 6px 0;
 }
 
-.auto-label {
-  flex-basis: 100%;
-  min-width: 0;
-  text-align: left;
-  padding-left: 96px;
+.note {
   color: var(--muted);
   font-size: 13px;
 }
 
-.auto-label:empty {
+.note:empty {
   display: none;
-}
-
-input[type="date"] {
-  font: inherit;
-  color: var(--text);
-  background: #2a2229;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 5px 10px;
-  color-scheme: dark;
 }
 
 .hint {
   margin: 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 kbd {
-  font: 12px ui-monospace, SFMono-Regular, Consolas, monospace;
-  background: #2a2229;
+  font: 11px ui-monospace, SFMono-Regular, Consolas, monospace;
+  background: var(--field);
   border: 1px solid var(--line);
   border-radius: 4px;
   padding: 1px 5px;
+}
+
+/* ---------- short windows: tighten the panel ---------- */
+@media (max-height: 640px) and (min-width: 761px) {
+  :root {
+    --pad: 16px;
+  }
+  .panel {
+    padding: 14px 16px;
+    gap: 12px;
+  }
+  .group {
+    padding-top: 10px;
+    gap: 6px;
+  }
+  .panel header p,
+  .hint {
+    display: none;
+  }
+}
+
+/* ---------- desktop: lock the page so it never scrolls ---------- */
+@media (min-width: 761px) {
+  body {
+    overflow: hidden;
+  }
+}
+
+/* ---------- phones: stack the clock above the controls ---------- */
+@media (max-width: 760px) {
+  :root {
+    --pad: 16px;
+  }
+  .app {
+    height: auto;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+  .clock {
+    width: min(100%, 520px);
+  }
+  .panel {
+    align-self: stretch;
+    max-height: none;
+    overflow: visible;
+  }
 }

@@ -8,13 +8,32 @@
   'use strict';
 
   const STEP = 1 / 30; // fixed update rate, same as the firmware will use
-  const LED = 8; // canvas pixels per LED
   const $ = (sel) => document.querySelector(sel);
 
   const display = $('#display');
   const g = display.getContext('2d');
-  display.width = PC.W * LED;
-  display.height = PC.H * LED;
+
+  // The canvas is drawn at exactly the size it's shown on screen (in device pixels),
+  // so LEDs stay crisp at any window size. EDGES[i] is where LED row/column i starts.
+  let EDGES = [];
+  let GAP = 1; // dark border on each side of an LED, in canvas pixels
+  function fitCanvas() {
+    const css = display.clientWidth || 448;
+    const dpr = window.devicePixelRatio || 1;
+    const px = Math.max(PC.W * 3, Math.round(css * dpr));
+    if (display.width !== px || EDGES.length === 0) {
+      display.width = px;
+      display.height = px;
+      const cell = px / PC.W;
+      EDGES = Array.from({ length: PC.W + 1 }, (_, i) => Math.round(i * cell));
+      GAP = Math.max(1, Math.round(cell / 8));
+    }
+    // CSS uses this to scale the diffuser blur with the LED size
+    document.documentElement.style.setProperty('--led', `${(css / PC.W).toFixed(2)}px`);
+  }
+  fitCanvas();
+  if ('ResizeObserver' in window) new ResizeObserver(fitCanvas).observe(display);
+  else window.addEventListener('resize', fitCanvas);
 
   const fb = new PC.Canvas();
   const rng = new PC.Rng((Date.now() ^ 0x5bd1e995) >>> 0);
@@ -196,7 +215,9 @@
         if (k < 1) c = PC.dim(c, k);
         const lum = ((c >> 16) & 255) + ((c >> 8) & 255) + (c & 255);
         g.fillStyle = lum < 24 ? css(UNLIT) : css(c);
-        g.fillRect(x * LED + 1, y * LED + 1, LED - 2, LED - 2);
+        const x0 = EDGES[x];
+        const y0 = EDGES[y];
+        g.fillRect(x0 + GAP, y0 + GAP, EDGES[x + 1] - x0 - 2 * GAP, EDGES[y + 1] - y0 - 2 * GAP);
       }
     }
   }
